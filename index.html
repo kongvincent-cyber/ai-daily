@@ -325,8 +325,15 @@ function showEPS(t){
  }else{
   body=`<div class="lab" style="margin-top:6px">No estimate/actual data available for this name.</div>`;
  }
- panel(`<b>${t}</b> <span style="color:#aeb7c9">${nm(t)}</span> <span class="lab">earnings: est vs actual</span>${body}
- <div class="lab" style="margin-top:6px">Source: Nasdaq consensus & reported EPS · surprise% = (act−est)/|est|</div>`);
+ const st=(D.street||{})[t]; let sb="";
+ if(st){
+  const drift=(st.qm_now!=null&&st.qm_1m!=null)?(st.qm_now>st.qm_1m?`<b class="pos">rising</b> (${st.qm_1m}→${st.qm_now})`:(st.qm_now<st.qm_1m?`<b class="neg">falling</b> (${st.qm_1m}→${st.qm_now})`:`flat (${st.qm_now})`)):"—";
+  sb=`<div class="lab" style="margin-top:8px">Consensus drift (1mo → now): ${drift}</div>`+
+     (st.pt!=null?`<div class="lab" style="margin-top:3px">Street: PT $${st.pt} (range $${st.lo}–$${st.hi}) · ${st.b} Buy / ${st.h} Hold / ${st.s} Sell</div>`:"");
+ }
+ panel(`<b>${t}</b> <span style="color:#aeb7c9">${nm(t)}</span> <span class="lab">earnings: est vs actual</span>${body}${sb}
+ <div class="lab" style="margin-top:6px">EPS beat ≠ good print — guidance, revenue & margins drive the reaction (AAPL 07-30: beat EPS +1.6%, fell −7.4% next day). The market's verdict = the AH snapshot & next-day % already on this app.</div>
+ <div class="lab" style="margin-top:3px">Source: Nasdaq consensus/reported EPS, analyst targets · surprise% = (act−est)/|est|</div>`);
 }
 function panel(html){const d=document.getElementById("det");d.innerHTML=`<span class="x" onclick="document.getElementById('det').style.display='none'">✕</span>`+html;d.style.display="block";window.scrollTo({top:0,behavior:"smooth"});}
 function showChar(){
