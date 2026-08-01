@@ -143,7 +143,9 @@ function render(){
  document.getElementById("kpi").innerHTML=[
   ["SPY",fp(D.spy.chg),cls(D.spy.chg),"showSPY"],["QQQ",fp(D.qqq),cls(D.qqq),"showQQQ"],
   ["Capex − Software",fp(D.bloc.cap-D.bloc.sw)+"pp",cls(D.bloc.cap-D.bloc.sw),"showCapSw"],
-  ["Gap win rate (>5% gap-ups)",D.gapmon.n?D.gapmon.win+"% ("+D.gapmon.n+" names)":"none",D.gapmon.n&&D.gapmon.win<30?"neg":"neu","showBurst"]
+  ["Advancers (of 249)",D.stats.up+"%",D.stats.up>=50?"pos":"neg","showAdv"],
+  ["Gap win rate (>5% gap-ups)",D.gapmon.n?D.gapmon.win+"% ("+D.gapmon.n+" names)":"none",D.gapmon.n&&D.gapmon.win<30?"neg":"neu","showGap"],
+  ["4% bursts (Pradeep)",(D.up4!==undefined?`${D.up4}↑ / ${D.dn4}↓`:"tap"),(D.up4!==undefined&&D.up4>=D.dn4)?"pos":"neg","showBurst"]
  ].map(([l,v,c,f])=>`<div class="card" style="cursor:pointer" onclick="${f}()"><div class="lab">${l} <span style="color:#5c6577">ⓘ</span></div><div class="val ${c}">${v}</div></div>`).join("");
  renderRows();
  document.getElementById("tb").innerHTML=
@@ -253,7 +255,7 @@ async function showBurst(){const S=await ensureSer();
  <div class="lab" style="margin:4px 0">Daily count of universe names closing <b class="pos">+4% on higher volume</b> (green) vs <b class="neg">−4% on higher volume</b> (red). Healthy tape: green persistently above red; clusters of red = distribution.</div>
  ${twoLine(S.up4,S.dn4)}
  <div class="lab" style="margin:4px 0">Today: <b class="pos">${S.up4[S.up4.length-1]}</b> bursts vs <b class="neg">${S.dn4[S.dn4.length-1]}</b> breakdowns</div>
- <div class="lab" style="margin:8px 0 4px">Gap win rate % (>5% gap-ups; blank days plotted as 0):</div>${lineSvg(S.gapwin,536,110,"#ffd479")}`);}
+ <div class="lab" style="margin-top:6px">Complementary read: bursts = "is institutional money buying somewhere today?" (environment). The Gap card = "does chasing the open pay?" (execution). Both green together = confirmed healthy tape.</div>`);}
 function panel(html){const d=document.getElementById("det");d.innerHTML=`<span class="x" onclick="document.getElementById('det').style.display='none'">✕</span>`+html;d.style.display="block";window.scrollTo({top:0,behavior:"smooth"});}
 function showChar(){
  const s=D.stats;
@@ -275,12 +277,20 @@ function showRegime(){
  panel(`<b>Regime — the master risk switch</b>
   <div class="lab" style="margin-top:6px">SPY above its 200-day moving average = <b>Bull</b>; below = <b>Bear</b>. In the research framework behind this app, new entries are only taken in Bull regime — regime beats position size beats price stops. The % shown is SPY's distance above/below the 200DMA (today ${fp(D.spy.ma200,1)}), i.e. how much cushion the regime has before flipping.</div>`);
 }
-function showGap(){
- const g=D.gapmon;
+async function showGap(){
+ const g=D.gapmon; let chart="";
+ try{const S=await ensureSer();chart=`<div class="lab" style="margin:8px 0 4px">Win rate % YTD (blank days = no qualifiers, plotted 0):</div>${lineSvg(S.gapwin,536,110,"#ffd479")}`;}catch(e){}
  panel(`<b>Gap monitor — chase-the-open thermometer</b>
   <div class="lab" style="margin-top:6px">Every universe name that opened >5% above the prior close. We track their <b>open→close</b> return and win rate (close above open). Healthy accumulation: gappers hold their gains. Distribution: they fade all day.</div>
   <div style="font-size:13px;margin:6px 0">Today: ${g.n?`<b>${g.n}</b> names · open→close median <b class="${cls(g.med)}">${fp(g.med)}</b> · win rate <b>${g.win}%</b>`:"no >5% gap-ups"}</div>
-  <div class="lab">Reference base rate (2026-07-31 audit): 58 gappers, median −5.22%, win rate 3% — chasing opens was toxic. If this win rate holds above ~50% for several days, the tape's character has genuinely changed.</div>`);
+  <div class="lab">Base rate (2026-07-31 audit): 58 gappers, median −5.22%, win 3% — chasing opens was toxic. Sustained >50% for days = character change.</div>${chart}`);
+}
+async function showAdv(){
+ let chart="";
+ try{const S=await ensureSer();if(S.adv)chart=`<div class="lab" style="margin:8px 0 4px">Advancers % YTD:</div>${lineSvg(S.adv,536,120,"#9a86ff")}`;}catch(e){}
+ panel(`<b>Advancers — participation breadth</b>
+  <div class="lab" style="margin-top:6px">Share of the 249 universe names that closed up on the day. ≥70% = broad advance; ≤30% = broad decline; the zone between is where rotation and index-vs-army splits live. Divergence to watch: index up while advancers <50% = narrow leadership.</div>
+  <div style="font-size:13px;margin:6px 0">Today: <b>${D.stats.up}%</b></div>${chart}`);
 }
 document.getElementById("pw").addEventListener("keydown",e=>{if(e.key==="Enter")unlock()});
 tryCache();
