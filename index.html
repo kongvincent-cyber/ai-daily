@@ -141,10 +141,10 @@ function render(){
   `<span class="chip" style="cursor:pointer" onclick="showRegime()">${D.regime==="牛"?"Bull":"Bear"} · SPY vs 200DMA ${fp(D.spy.ma200,1)} <span style="color:#5c6577">ⓘ</span></span>`+
   (D.lead3.length?`<span class="chip">3-day leaders: ${D.lead3.map(g=>GN[g]||g).join(", ")}</span>`:"");
  document.getElementById("kpi").innerHTML=[
-  ["SPY",fp(D.spy.chg),cls(D.spy.chg)],["QQQ",fp(D.qqq),cls(D.qqq)],
-  ["Capex − Software",fp(D.bloc.cap-D.bloc.sw)+"pp",cls(D.bloc.cap-D.bloc.sw)],
-  ["Gap win rate (>5% gap-ups)",D.gapmon.n?D.gapmon.win+"% ("+D.gapmon.n+" names)":"none",D.gapmon.n&&D.gapmon.win<30?"neg":"neu"]
- ].map(([l,v,c])=>`<div class="card"><div class="lab">${l}</div><div class="val ${c}">${v}</div></div>`).join("");
+  ["SPY",fp(D.spy.chg),cls(D.spy.chg),"showSPY"],["QQQ",fp(D.qqq),cls(D.qqq),"showQQQ"],
+  ["Capex − Software",fp(D.bloc.cap-D.bloc.sw)+"pp",cls(D.bloc.cap-D.bloc.sw),"showCapSw"],
+  ["Gap win rate (>5% gap-ups)",D.gapmon.n?D.gapmon.win+"% ("+D.gapmon.n+" names)":"none",D.gapmon.n&&D.gapmon.win<30?"neg":"neu","showBurst"]
+ ].map(([l,v,c,f])=>`<div class="card" style="cursor:pointer" onclick="${f}()"><div class="lab">${l} <span style="color:#5c6577">ⓘ</span></div><div class="val ${c}">${v}</div></div>`).join("");
  renderRows();
  document.getElementById("tb").innerHTML=
   D.top.map(x=>tagHtml(x,"pos")).join("")+D.bot.map(x=>tagHtml(x,"neg")).join("");
@@ -211,6 +211,49 @@ function renderHist(){
  }
 }
 
+let SER=null;
+async function ensureSer(){if(!SER)SER=await fetchEnc("series.enc");return SER;}
+function candleSvg(cs,W=536,H=200){
+ const hi=Math.max(...cs.map(x=>x.h)),lo=Math.min(...cs.map(x=>x.l)),rg=(hi-lo)||1;
+ const n=cs.length,bw=(W-10)/n,Y=v=>5+(hi-v)/rg*(H-10);
+ let s="";
+ cs.forEach((x,i)=>{const cx=5+i*bw+bw/2,up=x.c>=x.o,col=up?"#4cc38a":"#ff7a6b";
+  s+=`<line x1="${cx.toFixed(1)}" x2="${cx.toFixed(1)}" y1="${Y(x.h).toFixed(1)}" y2="${Y(x.l).toFixed(1)}" stroke="${col}" stroke-width="0.8"/>`;
+  const y1=Y(Math.max(x.o,x.c)),y2=Y(Math.min(x.o,x.c));
+  s+=`<rect x="${(cx-Math.max(bw*0.33,0.9)).toFixed(1)}" y="${y1.toFixed(1)}" width="${Math.max(bw*0.66,1.8).toFixed(1)}" height="${Math.max(y2-y1,0.9).toFixed(1)}" fill="${col}"/>`;});
+ return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:#10151f;border-radius:8px">${s}</svg>`;
+}
+function lineSvg(vals,W=536,H=140,col="#7aa2ff"){
+ const vs=vals.map(v=>v==null?0:v);
+ const hi=Math.max(...vs,0),lo=Math.min(...vs,0),rg=(hi-lo)||1;
+ const X=i=>5+(i/(vs.length-1))*(W-10),Y=v=>5+(hi-v)/rg*(H-10);
+ const pts=vs.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
+ return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:#10151f;border-radius:8px">
+  <line x1="5" x2="${W-5}" y1="${Y(0).toFixed(1)}" y2="${Y(0).toFixed(1)}" stroke="#2a3448" stroke-dasharray="4 4"/>
+  <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.6"/></svg>`;
+}
+function twoLine(a,b,W=536,H=150){
+ const hi=Math.max(...a,...b,1);
+ const X=i=>5+(i/(Math.max(a.length,2)-1))*(W-10),Y=v=>5+(hi-v)/hi*(H-10);
+ const p=s=>s.map((v,i)=>`${X(i).toFixed(1)},${Y(v||0).toFixed(1)}`).join(" ");
+ return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:#10151f;border-radius:8px">
+ <polyline points="${p(a)}" fill="none" stroke="#4cc38a" stroke-width="1.5"/>
+ <polyline points="${p(b)}" fill="none" stroke="#ff7a6b" stroke-width="1.5"/></svg>`;
+}
+async function showSPY(){const S=await ensureSer();const a=S.spy;const y=fp((a[a.length-1].c/a[0].o-1)*100,1);
+ panel(`<b>SPY — daily candles, YTD</b> <span class="lab">${S.dates[0]} → ${S.dates[S.dates.length-1]} · YTD ${y} · last ${a[a.length-1].c}</span><div style="margin-top:6px">${candleSvg(a)}</div>`);}
+async function showQQQ(){const S=await ensureSer();const a=S.qqq;const y=fp((a[a.length-1].c/a[0].o-1)*100,1);
+ panel(`<b>QQQ — daily candles, YTD</b> <span class="lab">${S.dates[0]} → ${S.dates[S.dates.length-1]} · YTD ${y} · last ${a[a.length-1].c}</span><div style="margin-top:6px">${candleSvg(a)}</div>`);}
+async function showCapSw(){const S=await ensureSer();
+ panel(`<b>Capex − Software — daily median diff (pp), YTD</b>
+ <div class="lab" style="margin:4px 0">Above zero = hardware bloc (L1+L2+L3+Q+SP+M) leading; below = software (L4+L5+L6). Cross-bloc correlation is only ~0.1, so persistent runs on one side = a rotation regime, not noise.</div>
+ ${lineSvg(S.capsw,536,150)}<div class="lab" style="margin-top:4px">Today ${fp(S.capsw[S.capsw.length-1],2)}pp</div>`);}
+async function showBurst(){const S=await ensureSer();
+ panel(`<b>4% momentum bursts (Pradeep) — YTD</b>
+ <div class="lab" style="margin:4px 0">Daily count of universe names closing <b class="pos">+4% on higher volume</b> (green) vs <b class="neg">−4% on higher volume</b> (red). Healthy tape: green persistently above red; clusters of red = distribution.</div>
+ ${twoLine(S.up4,S.dn4)}
+ <div class="lab" style="margin:4px 0">Today: <b class="pos">${S.up4[S.up4.length-1]}</b> bursts vs <b class="neg">${S.dn4[S.dn4.length-1]}</b> breakdowns</div>
+ <div class="lab" style="margin:8px 0 4px">Gap win rate % (>5% gap-ups; blank days plotted as 0):</div>${lineSvg(S.gapwin,536,110,"#ffd479")}`);}
 function panel(html){const d=document.getElementById("det");d.innerHTML=`<span class="x" onclick="document.getElementById('det').style.display='none'">✕</span>`+html;d.style.display="block";window.scrollTo({top:0,behavior:"smooth"});}
 function showChar(){
  const s=D.stats;
