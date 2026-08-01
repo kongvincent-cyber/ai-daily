@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="zh-HK"><head><meta charset="utf-8">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -6,10 +6,10 @@
 <meta name="theme-color" content="#0e1117">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
-<title>AI六層日報</title><style>
+<title>AI 6-Layer Daily</title><style>
 :root{color-scheme:dark}
 *{box-sizing:border-box}
-body{margin:0 auto;background:#0e1117;color:#e6e8ee;font-family:-apple-system,"PingFang HK","Noto Sans CJK TC",sans-serif;padding:max(14px,env(safe-area-inset-top)) 12px 42px;max-width:560px}
+body{margin:0 auto;background:#0e1117;color:#e6e8ee;font-family:-apple-system,"SF Pro Text",Segoe UI,Roboto,sans-serif;padding:max(14px,env(safe-area-inset-top)) 12px 42px;max-width:560px}
 h1{font-size:18px;margin:2px 0;color:#fff;display:flex;justify-content:space-between;align-items:center;gap:8px}
 select,input[type=search]{background:#1b2230;color:#e6e8ee;border:1px solid #2a3448;border-radius:8px;padding:6px 10px;font-size:14px}
 .sub{color:#8a93a6;font-size:12px;margin-bottom:8px}
@@ -22,20 +22,21 @@ select,input[type=search]{background:#1b2230;color:#e6e8ee;border:1px solid #2a3
 .grow{padding:8px 2px;border-bottom:1px solid #1d2534;cursor:pointer}
 .grow:last-child{border:none}
 .grow .row{display:flex;align-items:center;gap:8px}
-.gname{width:88px;font-size:12.5px;flex-shrink:0}
+.gname{width:104px;font-size:12px;flex-shrink:0;line-height:1.3}
 .caret{color:#5c6577;font-size:10px;width:10px;flex-shrink:0}
 .spark{flex:1;min-width:0}
-.gmed{width:62px;text-align:right;font-weight:700;font-size:14px;flex-shrink:0}
-.gsub{width:88px;text-align:right;color:#8a93a6;font-size:10.5px;line-height:1.4;flex-shrink:0}
+.gmed{width:58px;text-align:right;font-weight:700;font-size:14px;flex-shrink:0}
+.gsub{width:82px;text-align:right;color:#8a93a6;font-size:10px;line-height:1.4;flex-shrink:0}
 .mem{display:none;flex-wrap:wrap;gap:5px;padding:8px 2px 2px 18px}
 .mem.open{display:flex}
-.mchip{background:#1b2230;border:1px solid #2a3448;border-radius:7px;padding:3px 7px;font-size:11.5px;cursor:pointer}
-.mchip b{font-weight:700}
+.mchip{background:#1b2230;border:1px solid #2a3448;border-radius:7px;padding:3px 8px;font-size:11.5px;cursor:pointer;line-height:1.5}
+.mchip small{color:#8a93a6;font-size:10px;display:block;margin-top:-1px}
 h2{font-size:13.5px;color:#aeb7c9;margin:16px 0 6px}
 .tags{display:flex;flex-wrap:wrap;gap:6px}
 .tag{background:#1b2230;border:1px solid #2a3448;border-radius:8px;padding:5px 9px;font-size:12.5px;cursor:pointer}
-.tag .e,.mchip .e{color:#ffd479;font-size:10px;margin-left:3px;border:1px solid #5c4a1e;border-radius:4px;padding:0 3px}
-.earn{font-size:12.5px;line-height:1.75;color:#cdd3de}
+.tag small{color:#8a93a6;font-size:10px;display:block}
+.e{color:#ffd479;font-size:10px;margin-left:3px;border:1px solid #5c4a1e;border-radius:4px;padding:0 3px}
+.earn{font-size:12.5px;line-height:1.8;color:#cdd3de}
 .earn b{color:#fff}
 .foot{color:#5c6577;font-size:10.5px;margin-top:18px;line-height:1.5}
 button{background:#1b2230;color:#aeb7c9;border:1px solid #2a3448;border-radius:8px;padding:4px 10px;font-size:11.5px}
@@ -51,29 +52,33 @@ button{background:#1b2230;color:#aeb7c9;border:1px solid #2a3448;border-radius:8
 .trend{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
 </style></head><body>
 <div id="lock"><img src="icon-180.png" width="64" height="64" style="border-radius:14px">
-<div style="font-size:17px;font-weight:700">AI六層日報</div>
-<input id="pw" type="password" placeholder="輸入解鎖密碼" autocomplete="current-password">
-<button onclick="unlock()">解鎖</button><div id="lockmsg"></div></div>
+<div style="font-size:17px;font-weight:700">AI 6-Layer Daily</div>
+<input id="pw" type="password" placeholder="Enter passcode" autocomplete="current-password">
+<button onclick="unlock()">Unlock</button><div id="lockmsg"></div></div>
 <div id="app" style="display:none">
-<h1><span>AI六層日報</span><span style="display:flex;gap:6px;align-items:center"><span class="lab">歷史</span><select id="dsel" onchange="loadDay(this.value)"></select></span></h1>
+<h1><span>AI 6-Layer Daily</span><span style="display:flex;gap:6px;align-items:center"><span class="lab">History</span><select id="dsel" onchange="loadDay(this.value)"></select></span></h1>
 <div class="sub" id="sub"></div>
-<input id="q" type="search" placeholder="🔍 搜尋代號（例：SNDK / PLTR）" style="width:100%;margin:4px 0" oninput="srch(this.value)">
+<input id="q" type="search" placeholder="🔍 Search ticker or name (e.g. SNDK / Palantir)" style="width:100%;margin:4px 0" oninput="srch(this.value)">
 <div class="card" id="det"></div>
 <div class="chips" id="chips"></div>
 <div class="kpi" id="kpi"></div>
-<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px"><h2 style="margin:0">九組強度 · 撳組名展開成員</h2><button id="sbtn" onclick="tg()">排序：中位%</button></div><div id="grows"></div></div>
-<h2>Top 5 ↑ / Bottom 5 ↓（撳個名睇詳情）</h2><div class="tags" id="tb"></div>
-<h2>缺口監察</h2><div class="card" id="gap" style="font-size:13px"></div>
-<h2>財報節點</h2><div class="card earn" id="earn"></div>
-<h2>近期軌跡</h2><div class="trend" id="trend"></div><div class="hist" id="hist"></div>
-<div class="foot">只陳述數據形態，非投資建議 · 內容AES-256-GCM加密 · 〔財〕=過去24h放榜 · σ=組內分散度 · 收位=(收−低)/(高−低)<br><span id="upd"></span></div>
+<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px"><h2 style="margin:0">Group strength · tap a row to expand</h2><button id="sbtn" onclick="tg(event)">Sort: median %</button></div><div id="grows"></div></div>
+<h2>Top 5 ↑ / Bottom 5 ↓ · tap for detail</h2><div class="tags" id="tb"></div>
+<h2>Gap monitor</h2><div class="card" id="gap" style="font-size:13px"></div>
+<h2>Earnings nodes</h2><div class="card earn" id="earn"></div>
+<h2>Recent track</h2><div class="trend" id="trend"></div><div class="hist" id="hist"></div>
+<div class="foot">Data patterns only — not investment advice · AES-256-GCM encrypted · <span class="e">E</span> = reported within past 24h · σ = intra-group dispersion · pos = (close−low)/(high−low)<br><span id="upd"></span></div>
 </div>
 <script>
 const SALT=Uint8Array.from(atob("Z2A1ADsTMohzmPeJPEV/RQ=="),c=>c.charCodeAt(0));
 const ITER=310000;
 let KEY=null,D=null,mode="med",MAN=null,HIST=null,openG=null;
+const GN={L1:"L1 Energy & Power",L2:"L2 Semiconductors",L3:"L3 AI Infrastructure",L4:"L4 Models",L5:"L5 Data & Security",L6:"L6 Applications",Q:"Q Quantum",SP:"SP Space",M:"M Miner→AI"};
+const CH={broad_adv:"Broad advance",broad_dec:"Broad decline",gap_fade:"Gap-up, faded into close",dip_recover:"Gap-down, recovered",split:"Split / rotation"};
 const fp=(v,d=2)=>(v>0?"+":"")+v.toFixed(d)+"%";
 const cls=v=>v>0?"pos":(v<0?"neg":"neu");
+const nm=t=>(D&&D.names&&D.names[t])||"";
+const short=(s,n=15)=>s.length>n?s.slice(0,n-1)+"…":s;
 async function deriveKey(pw){
  const km=await crypto.subtle.importKey("raw",new TextEncoder().encode(pw),"PBKDF2",false,["deriveKey"]);
  return crypto.subtle.deriveKey({name:"PBKDF2",salt:SALT,iterations:ITER,hash:"SHA-256"},km,{name:"AES-GCM",length:256},true,["decrypt"]);
@@ -88,7 +93,7 @@ async function unlock(){
  try{KEY=await deriveKey(pw);await boot();
   const raw=await crypto.subtle.exportKey("raw",KEY);
   try{localStorage.setItem("k",btoa(String.fromCharCode(...new Uint8Array(raw))));}catch(e){}
- }catch(e){document.getElementById("lockmsg").textContent="密碼唔啱或者數據載入失敗";KEY=null;}
+ }catch(e){document.getElementById("lockmsg").textContent="Wrong passcode or data unavailable";KEY=null;}
 }
 async function tryCache(){const k=localStorage.getItem("k");if(!k)return;
  try{KEY=await crypto.subtle.importKey("raw",Uint8Array.from(atob(k),c=>c.charCodeAt(0)),{name:"AES-GCM"},true,["decrypt"]);await boot();}
@@ -115,77 +120,94 @@ function spark(seq,w=120,h=26){
   <line x1="0" y1="${Y(0)}" x2="${w}" y2="${Y(0)}" stroke="#2a3448" stroke-dasharray="3 3" stroke-width="1"/>
   <polyline points="${pts}" fill="none" stroke="${vs[vs.length-1]>=0?"#4cc38a":"#ff7a6b"}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
 }
+function charTxt(){
+ if(D.charc&&CH[D.charc]) return CH[D.charc]+(D.leads?` · leaders: ${D.leads.map(g=>GN[g]).join(" / ")}`:"");
+ return D.char;
+}
+function decorate(list){ // "PLTR(L6) 盤後+8%（快照）" → "PLTR Palantir (L6) after-hrs..."
+ if(!list||!list.length)return "—";
+ return list.map(s=>{
+  const m=s.match(/^([A-Z.]+)\(([^)]+)\)(.*)$/);
+  if(!m)return s;
+  let rest=m[3].replace("盤後"," AH ").replace("（快照）"," (snap)").replace("（生成時快照）"," (snap)");
+  return `${m[1]} <small style="color:#8a93a6">${short(nm(m[1]),12)}</small>(${m[2]})${rest}`;
+ }).join("、 ");
+}
 function render(){
- document.getElementById("sub").textContent=`${D.date}（${D.wd}） · 宇宙249隻`+(D.miss.length?` · 缺${D.miss.length}`:"");
+ const wd=new Date(D.date+"T12:00:00Z").toLocaleDateString("en-US",{weekday:"short"});
+ document.getElementById("sub").textContent=`${D.date} (${wd}) · universe 249`+(D.miss.length?` · ${D.miss.length} missing`:"");
  document.getElementById("chips").innerHTML=
-  `<span class="chip">${D.char}</span>`+
-  `<span class="chip">${D.regime}市 · SPY vs 200DMA ${fp(D.spy.ma200,1)}</span>`+
-  (D.lead3.length?`<span class="chip">連續3日領先：${D.lead3.join("、")}</span>`:"");
+  `<span class="chip">${charTxt()}</span>`+
+  `<span class="chip">${D.regime==="牛"?"Bull":"Bear"} · SPY vs 200DMA ${fp(D.spy.ma200,1)}</span>`+
+  (D.lead3.length?`<span class="chip">3-day leaders: ${D.lead3.map(g=>GN[g]||g).join(", ")}</span>`:"");
  document.getElementById("kpi").innerHTML=[
   ["SPY",fp(D.spy.chg),cls(D.spy.chg)],["QQQ",fp(D.qqq),cls(D.qqq)],
-  ["capex−軟件差",fp(D.bloc.cap-D.bloc.sw)+"pp",cls(D.bloc.cap-D.bloc.sw)],
-  ["缺口勝率（高開>5%）",D.gapmon.n?D.gapmon.win+"%（"+D.gapmon.n+"隻）":"無高開",D.gapmon.n&&D.gapmon.win<30?"neg":"neu"]
+  ["Capex − Software",fp(D.bloc.cap-D.bloc.sw)+"pp",cls(D.bloc.cap-D.bloc.sw)],
+  ["Gap win rate (>5% gap-ups)",D.gapmon.n?D.gapmon.win+"% ("+D.gapmon.n+" names)":"none",D.gapmon.n&&D.gapmon.win<30?"neg":"neu"]
  ].map(([l,v,c])=>`<div class="card"><div class="lab">${l}</div><div class="val ${c}">${v}</div></div>`).join("");
  renderRows();
  document.getElementById("tb").innerHTML=
   D.top.map(x=>tagHtml(x,"pos")).join("")+D.bot.map(x=>tagHtml(x,"neg")).join("");
  document.getElementById("gap").innerHTML=D.gapmon.n?
-  `高開>5%共 <b>${D.gapmon.n}</b> 隻｜開→收中位 <b class="${cls(D.gapmon.med)}">${fp(D.gapmon.med)}</b>｜勝率 <b>${D.gapmon.win}%</b><div class="lab" style="margin-top:4px">全宇宙：gap中位 ${fp(D.stats.gap)} → 開→收中位 ${fp(D.stats.o2c)}，升家 ${D.stats.up}%</div>`
-  :"今日無>5%高開";
- const j=a=>a&&a.length?a.join("、"):"無";
+  `${D.gapmon.n} names gapped up >5% | open→close median <b class="${cls(D.gapmon.med)}">${fp(D.gapmon.med)}</b> | win rate <b>${D.gapmon.win}%</b><div class="lab" style="margin-top:4px">Whole universe: median gap ${fp(D.stats.gap)} → open→close ${fp(D.stats.o2c)}, advancers ${D.stats.up}%</div>`
+  :"No >5% gap-ups today";
  document.getElementById("earn").innerHTML=
-  `<b>今日已出</b>（已反映）：今晨盤前 ${j(D.earn.today_pre)}；尋日 ${j(D.earn.prev)}<br>`+
-  `<b>今晚已出</b>（未反映，快照）：${j(D.earn.tonight)}<br>`+
-  `<b>下一交易日</b>（${D.earn.nx}）：盤前 ${j(D.earn.nxt_pre)}；盤後 ${j(D.earn.nxt_aft)}`;
- document.getElementById("upd").textContent="數據日："+D.date;
+  `<b>Already out</b> (in today's price) — pre-market: ${decorate(D.earn.today_pre)}; yesterday: ${decorate(D.earn.prev)}<br>`+
+  `<b>Tonight after close</b> (not yet priced, snapshot): ${decorate(D.earn.tonight)}<br>`+
+  `<b>Next session</b> (${D.earn.nx}) — pre: ${decorate(D.earn.nxt_pre)}; after: ${decorate(D.earn.nxt_aft)}`;
+ document.getElementById("upd").textContent="Data date: "+D.date;
  const s=document.getElementById("dsel");
  for(const o of s.options){if(o.value===D.date.replaceAll("-","")){s.value=o.value;break}}
 }
-function tagHtml(x,c){return `<span class="tag" onclick="showT('${x.t}')"><b class="${c}">${fp(x.c,1)}</b> ${x.t}·${x.g}${x.e?'<span class=e>財</span>':''}</span>`}
+function tagHtml(x,c){return `<span class="tag" onclick="showT('${x.t}')"><b class="${c}">${fp(x.c,1)}</b> ${x.t}${x.e?'<span class="e">E</span>':''}<small>${short(nm(x.t),14)} · ${x.g}</small></span>`}
 function renderRows(){
  const gs=[...D.groups].sort((a,b)=>mode==="med"?b.med-a.med:b.sig-a.sig);
  document.getElementById("grows").innerHTML=gs.map(g=>{
   const w=(g.sig>4||g.sig>Math.abs(g.med)*3)?" ⚠":"";
   const open=openG===g.g;
   const mem=(D.members&&D.members[g.g]||[]).map(m=>
-   `<span class="mchip" onclick="event.stopPropagation();showT('${m.t}')">${m.t} <b class="${cls(m.c)}">${fp(m.c,1)}</b>${m.e?'<span class=e>財</span>':''}</span>`).join("");
-  return `<div class="grow" onclick="tgG('${g.g}')"><div class="row"><span class="caret">${open?"▼":"▶"}</span><div class="gname">${g.name}</div>${spark(D.ghist[g.g])}
+   `<span class="mchip" onclick="event.stopPropagation();showT('${m.t}')">${m.t} <b class="${cls(m.c)}">${fp(m.c,1)}</b>${m.e?'<span class="e">E</span>':''}<small>${short(nm(m.t),16)}</small></span>`).join("");
+  return `<div class="grow" onclick="tgG('${g.g}')"><div class="row"><span class="caret">${open?"▼":"▶"}</span><div class="gname">${GN[g.g]||g.name}</div>${spark(D.ghist[g.g])}
    <div class="gmed ${cls(g.med)}">${fp(g.med)}</div>
-   <div class="gsub">升家${g.up}% 收位${g.rp.toFixed(2)}<br>σ${g.sig.toFixed(1)}${w}</div></div>
+   <div class="gsub">adv ${g.up}% · pos ${g.rp.toFixed(2)}<br>σ ${g.sig.toFixed(1)}${w}</div></div>
    <div class="mem${open?" open":""}">${mem}</div></div>`;
  }).join("");
- document.getElementById("sbtn").textContent=mode==="med"?"排序：中位%":"排序：σ分散度";
+ document.getElementById("sbtn").textContent=mode==="med"?"Sort: median %":"Sort: σ dispersion";
 }
 function tgG(g){openG=(openG===g)?null:g;renderRows();}
-function tg(){mode=mode==="med"?"sig":"med";renderRows();event.stopPropagation();}
+function tg(ev){mode=mode==="med"?"sig":"med";renderRows();if(ev)ev.stopPropagation();}
 function findM(t){for(const g in (D.members||{})){const m=(D.members[g]||[]).find(x=>x.t===t);if(m)return {...m,g};}return null;}
 function showT(t){
  const m=findM(t);const d=document.getElementById("det");
  if(!m){d.style.display="none";return;}
  const sh=(D.sh&&D.sh[t])||[];
  d.innerHTML=`<span class="x" onclick="document.getElementById('det').style.display='none'">✕</span>
-  <b>${t}</b> <span class="lab">${m.g}</span>${m.e?'<span class="e" style="font-size:11px;margin-left:4px">過去24h放榜</span>':''}
+  <b>${t}</b> <span style="color:#aeb7c9">${nm(t)}</span> <span class="lab">${GN[m.g]||m.g}</span>${m.e?'<span class="e">reported past 24h</span>':''}
   <div style="display:flex;gap:14px;align-items:center;margin-top:6px">
-   <div><div class="lab">當日</div><div class="val ${cls(m.c)}" style="font-size:16px">${fp(m.c,1)}</div></div>
-   <div><div class="lab">開盤缺口</div><div class="val ${cls(m.gp)}" style="font-size:16px">${fp(m.gp,1)}</div></div>
-   <div><div class="lab">收位</div><div class="val" style="font-size:16px">${m.rp.toFixed(2)}</div></div>
+   <div><div class="lab">Day</div><div class="val ${cls(m.c)}" style="font-size:16px">${fp(m.c,1)}</div></div>
+   <div><div class="lab">Open gap</div><div class="val ${cls(m.gp)}" style="font-size:16px">${fp(m.gp,1)}</div></div>
+   <div><div class="lab">Close pos</div><div class="val" style="font-size:16px">${m.rp.toFixed(2)}</div></div>
    <div style="flex:1">${spark(sh,120,30)}</div></div>
-  <div class="lab" style="margin-top:4px">走勢=近${sh.length}個交易日每日%</div>`;
+  <div class="lab" style="margin-top:4px">trend = last ${sh.length} daily % moves</div>`;
  d.style.display="block";window.scrollTo({top:0,behavior:"smooth"});
 }
 function srch(q){
  q=q.trim().toUpperCase();
- if(q.length>=1&&findM(q)){showT(q);}
- else if(!q){document.getElementById("det").style.display="none";}
+ if(!q){document.getElementById("det").style.display="none";return;}
+ if(findM(q)){showT(q);return;}
+ if(D.names){ // search by company name
+  const hit=Object.keys(D.names).find(t=>D.names[t].toUpperCase().includes(q));
+  if(hit)showT(hit);
+ }
 }
 function renderHist(){
  if(!HIST||!HIST.length)return;
  document.getElementById("hist").innerHTML=HIST.slice(-14).reverse().map(h=>
-  `<div class="hcard">${h.date.slice(5)}<b class="${cls(h.spy)}">SPY ${fp(h.spy)}</b>缺口勝率 ${h.gapn?h.gapwin+"%":"—"}<br>差 ${fp(h.capdiff,2)}pp</div>`).join("");
+  `<div class="hcard">${h.date.slice(5)}<b class="${cls(h.spy)}">SPY ${fp(h.spy)}</b>gap win ${h.gapn?h.gapwin+"%":"—"}<br>capex−sw ${fp(h.capdiff,2)}pp</div>`).join("");
  if(HIST.length>=3){
   const t=document.getElementById("trend");
-  t.innerHTML=`<div class="card"><div class="lab">缺口勝率%（日）</div>${spark(HIST.map(h=>h.gapn?h.gapwin:0),140,34)}</div>
-   <div class="card"><div class="lab">capex−軟件差 pp（日）</div>${spark(HIST.map(h=>h.capdiff),140,34)}</div>`;
+  t.innerHTML=`<div class="card"><div class="lab">Gap win rate % (daily)</div>${spark(HIST.map(h=>h.gapn?h.gapwin:0),140,34)}</div>
+   <div class="card"><div class="lab">Capex − Software pp (daily)</div>${spark(HIST.map(h=>h.capdiff),140,34)}</div>`;
  }
 }
 document.getElementById("pw").addEventListener("keydown",e=>{if(e.key==="Enter")unlock()});
