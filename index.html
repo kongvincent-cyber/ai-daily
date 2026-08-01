@@ -255,6 +255,28 @@ function lineSvg(vals,W=536,H=140,col="#7aa2ff"){
   <line x1="5" x2="${W-5}" y1="${Y(0).toFixed(1)}" y2="${Y(0).toFixed(1)}" stroke="#2a3448" stroke-dasharray="4 4"/>
   <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.6"/></svg>`;
 }
+function gapWinChart(S,W=536,H=150){
+ const n=S.gapn,w=S.gapwin;
+ const wins=n.map((x,i)=>w[i]==null?0:Math.round(x*w[i]/100));
+ const roll=[];
+ for(let i=0;i<n.length;i++){
+  let sn=0,sw=0;
+  for(let j=Math.max(0,i-9);j<=i;j++){sn+=n[j]||0;sw+=wins[j]||0;}
+  roll.push(sn>0?100*sw/sn:null);
+ }
+ const X=i=>5+(i/(n.length-1))*(W-10),Y=v=>5+(100-v)/100*(H-10);
+ let seg="",pts=[];
+ roll.forEach((v,i)=>{if(v==null){if(pts.length>1)seg+=`<polyline points="${pts.join(" ")}" fill="none" stroke="#ffd479" stroke-width="1.8"/>`;pts=[];}
+  else pts.push(`${X(i).toFixed(1)},${Y(v).toFixed(1)}`);});
+ if(pts.length>1)seg+=`<polyline points="${pts.join(" ")}" fill="none" stroke="#ffd479" stroke-width="1.8"/>`;
+ let dots="";
+ w.forEach((v,i)=>{if(v!=null&&n[i]>=5)dots+=`<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="1.8" fill="#ffd479" opacity="0.45"/>`;});
+ return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:#10151f;border-radius:8px">
+  <line x1="5" x2="${W-5}" y1="${Y(50).toFixed(1)}" y2="${Y(50).toFixed(1)}" stroke="#2a3448" stroke-dasharray="4 4"/>
+  <text x="8" y="${(Y(50)-3).toFixed(1)}" fill="#5c6577" font-size="9">50%</text>
+  <text x="8" y="12" fill="#5c6577" font-size="9">100%</text><text x="8" y="${H-4}" fill="#5c6577" font-size="9">0%</text>
+  ${dots}${seg}</svg>`;
+}
 function twoLine(a,b,W=536,H=150){
  const hi=Math.max(...a,...b,1);
  const X=i=>5+(i/(Math.max(a.length,2)-1))*(W-10),Y=v=>5+(hi-v)/hi*(H-10);
@@ -300,7 +322,7 @@ function showRegime(){
 }
 async function showGap(){
  const g=D.gapmon; let chart="";
- try{const S=await ensureSer();chart=`<div class="lab" style="margin:8px 0 4px">Win rate % YTD (blank days = no qualifiers, plotted 0):</div>${lineSvg(S.gapwin,536,110,"#ffd479")}`;}catch(e){}
+ try{const S=await ensureSer();chart=`<div class="lab" style="margin:8px 0 4px">Win rate YTD — line = rolling 10-session pooled rate (wins÷gappers); dots = single days with ≥5 qualifiers; dashed = 50% "chases work" threshold:</div>${gapWinChart(S)}`;}catch(e){}
  panel(`<b>Gap monitor — chase-the-open thermometer</b>
   <div class="lab" style="margin-top:6px">Every universe name that opened >5% above the prior close. We track their <b>open→close</b> return and win rate (close above open). Healthy accumulation: gappers hold their gains. Distribution: they fade all day.</div>
   <div style="font-size:13px;margin:6px 0">Today: ${g.n?`<b>${g.n}</b> names · open→close median <b class="${cls(g.med)}">${fp(g.med)}</b> · win rate <b>${g.win}%</b>`:"no >5% gap-ups"}</div>
