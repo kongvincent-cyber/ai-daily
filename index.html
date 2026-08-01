@@ -130,7 +130,7 @@ function decorate(list){ // "PLTR(L6) 盤後+8%（快照）" → "PLTR Palantir 
   const m=s.match(/^([A-Z.]+)\(([^)]+)\)(.*)$/);
   if(!m)return s;
   let rest=m[3].replace("盤後"," AH ").replace("（快照）"," (snap)").replace("（生成時快照）"," (snap)");
-  return `${m[1]} <small style="color:#8a93a6">${short(nm(m[1]),12)}</small>(${m[2]})${rest}`;
+  return `<span style="cursor:pointer;border-bottom:1px dotted #5c6577" onclick="showEPS('${m[1]}')">${m[1]}</span> <small style="color:#8a93a6">${short(nm(m[1]),12)}</small>(${m[2]})${rest}`;
  }).join("、 ");
 }
 function render(){
@@ -201,6 +201,7 @@ async function showT(t){
    <div><div class="lab">Open gap</div><div class="val ${cls(m.gp)}" style="font-size:16px">${fp(m.gp,1)}</div></div>
    <div><div class="lab">Close pos</div><div class="val" style="font-size:16px">${m.rp.toFixed(2)}</div></div>
   </div>
+  ${epsLine(t)}
   <div id="tchart" style="margin-top:8px">${spark(sh,120,30)}<div class="lab">loading YTD chart…</div></div>`;
  d.style.display="block";window.scrollTo({top:0,behavior:"smooth"});
  try{LASTC=await fetchEnc("charts/"+t+".enc");drawTickChart();}
@@ -299,6 +300,13 @@ async function showBurst(){const S=await ensureSer();
  ${twoLine(S.up4,S.dn4)}
  <div class="lab" style="margin:4px 0">Today: <b class="pos">${S.up4[S.up4.length-1]}</b> bursts vs <b class="neg">${S.dn4[S.dn4.length-1]}</b> breakdowns</div>
  <div class="lab" style="margin-top:6px">Complementary read: bursts = "is institutional money buying somewhere today?" (environment). The Gap card = "does chasing the open pay?" (execution). Both green together = confirmed healthy tape.</div>`);}
+function epsLine(t){
+ const e=(D.eps||{})[t], est=(D.ests||{})[t];
+ if(e){const sp=parseFloat(e.sp);
+  return `<div class="lab" style="margin-top:6px;cursor:pointer" onclick="showEPS('${t}')">Earnings ${e.q}: actual ${fmt$(e.act)} vs est ${fmt$(e.est)} → <b class="${isNaN(sp)?"neu":(sp>=0?"pos":"neg")}">${e.sp}%</b> · tap for 4-qtr track</div>`;}
+ if(est)return `<div class="lab" style="margin-top:6px;cursor:pointer" onclick="showEPS('${t}')">Upcoming earnings · consensus est ${fmt$(est)}</div>`;
+ return "";
+}
 function fmt$(v){if(v==null||v==="")return "—";const s=String(v);return s.startsWith("$")||s.startsWith("(")?s:"$"+s;}
 function showEPS(t){
  const e=(D.eps||{})[t], est=(D.ests||{})[t];
