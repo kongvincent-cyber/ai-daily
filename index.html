@@ -179,7 +179,18 @@ function renderRows(){
 function tgG(g){openG=(openG===g)?null:g;renderRows();}
 function tg(ev){mode=mode==="med"?"sig":"med";renderRows();if(ev)ev.stopPropagation();}
 function findM(t){for(const g in (D.members||{})){const m=(D.members[g]||[]).find(x=>x.t===t);if(m)return {...m,g};}return null;}
-function showT(t){
+let MASET="std",LASTC=null;
+function maPick(ma){return MASET==="std"?{m20:ma.m20,m50:ma.m50,m200:ma.m200}:{m10:ma.m10,m100:ma.m100,m200:ma.m200};}
+function maLeg(){const MC={m10:"#ffd479",m20:"#ffd479",m50:"#6ea8fe",m100:"#6ea8fe",m200:"#e6e8ee"};
+ const ks=MASET==="std"?["m20","m50","m200"]:["m10","m100","m200"];
+ return ks.map(k=>`<span style="color:${MC[k]}">— MA${k.slice(1)}</span>`).join(" · ");}
+function drawTickChart(){
+ if(!LASTC)return;
+ document.getElementById("tchart").innerHTML=candleSvg(LASTC.ohlc,536,190,maPick(LASTC.ma))+
+  `<div class="lab" style="margin-top:4px">${maLeg()} · YTD ${LASTC.dates[0]}→${LASTC.dates[LASTC.dates.length-1]}
+   <button style="margin-left:8px" onclick="MASET=MASET==='std'?'alt':'std';drawTickChart()">MA: ${MASET==="std"?"20/50/200":"10/100/200"} ⇄</button></div>`;
+}
+async function showT(t){
  const m=findM(t);const d=document.getElementById("det");
  if(!m){d.style.display="none";return;}
  const sh=(D.sh&&D.sh[t])||[];
@@ -189,9 +200,11 @@ function showT(t){
    <div><div class="lab">Day</div><div class="val ${cls(m.c)}" style="font-size:16px">${fp(m.c,1)}</div></div>
    <div><div class="lab">Open gap</div><div class="val ${cls(m.gp)}" style="font-size:16px">${fp(m.gp,1)}</div></div>
    <div><div class="lab">Close pos</div><div class="val" style="font-size:16px">${m.rp.toFixed(2)}</div></div>
-   <div style="flex:1">${spark(sh,120,30)}</div></div>
-  <div class="lab" style="margin-top:4px">trend = last ${sh.length} daily % moves</div>`;
+  </div>
+  <div id="tchart" style="margin-top:8px">${spark(sh,120,30)}<div class="lab">loading YTD chart…</div></div>`;
  d.style.display="block";window.scrollTo({top:0,behavior:"smooth"});
+ try{LASTC=await fetchEnc("charts/"+t+".enc");drawTickChart();}
+ catch(e){const el=document.getElementById("tchart");if(el)el.innerHTML=spark(sh,120,30)+`<div class="lab">YTD chart unavailable · trend = last ${sh.length} daily % moves</div>`;}
 }
 function srch(q){
  q=q.trim().toUpperCase();
