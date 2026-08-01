@@ -10,8 +10,8 @@
 :root{color-scheme:dark}
 *{box-sizing:border-box}
 body{margin:0 auto;background:#0e1117;color:#e6e8ee;font-family:-apple-system,"PingFang HK","Noto Sans CJK TC",sans-serif;padding:max(14px,env(safe-area-inset-top)) 12px 42px;max-width:560px}
-h1{font-size:18px;margin:2px 0;color:#fff;display:flex;justify-content:space-between;align-items:center}
-h1 select{background:#1b2230;color:#e6e8ee;border:1px solid #2a3448;border-radius:8px;padding:4px 8px;font-size:13px}
+h1{font-size:18px;margin:2px 0;color:#fff;display:flex;justify-content:space-between;align-items:center;gap:8px}
+select,input[type=search]{background:#1b2230;color:#e6e8ee;border:1px solid #2a3448;border-radius:8px;padding:6px 10px;font-size:14px}
 .sub{color:#8a93a6;font-size:12px;margin-bottom:8px}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
 .chip{background:#1b2230;border:1px solid #2a3448;border-radius:20px;padding:4px 11px;font-size:12.5px}
@@ -19,16 +19,22 @@ h1 select{background:#1b2230;color:#e6e8ee;border:1px solid #2a3448;border-radiu
 .card{background:#161b26;border:1px solid #232c3d;border-radius:12px;padding:10px 12px}
 .lab{font-size:11px;color:#8a93a6}.val{font-size:19px;font-weight:700;margin-top:2px}
 .pos{color:#4cc38a}.neg{color:#ff7a6b}.neu{color:#e6e8ee}
-.grow{display:flex;align-items:center;gap:8px;padding:8px 2px;border-bottom:1px solid #1d2534}
+.grow{padding:8px 2px;border-bottom:1px solid #1d2534;cursor:pointer}
 .grow:last-child{border:none}
+.grow .row{display:flex;align-items:center;gap:8px}
 .gname{width:88px;font-size:12.5px;flex-shrink:0}
+.caret{color:#5c6577;font-size:10px;width:10px;flex-shrink:0}
 .spark{flex:1;min-width:0}
 .gmed{width:62px;text-align:right;font-weight:700;font-size:14px;flex-shrink:0}
 .gsub{width:88px;text-align:right;color:#8a93a6;font-size:10.5px;line-height:1.4;flex-shrink:0}
+.mem{display:none;flex-wrap:wrap;gap:5px;padding:8px 2px 2px 18px}
+.mem.open{display:flex}
+.mchip{background:#1b2230;border:1px solid #2a3448;border-radius:7px;padding:3px 7px;font-size:11.5px;cursor:pointer}
+.mchip b{font-weight:700}
 h2{font-size:13.5px;color:#aeb7c9;margin:16px 0 6px}
 .tags{display:flex;flex-wrap:wrap;gap:6px}
-.tag{background:#1b2230;border:1px solid #2a3448;border-radius:8px;padding:5px 9px;font-size:12.5px}
-.tag .e{color:#ffd479;font-size:10px;margin-left:3px;border:1px solid #5c4a1e;border-radius:4px;padding:0 3px}
+.tag{background:#1b2230;border:1px solid #2a3448;border-radius:8px;padding:5px 9px;font-size:12.5px;cursor:pointer}
+.tag .e,.mchip .e{color:#ffd479;font-size:10px;margin-left:3px;border:1px solid #5c4a1e;border-radius:4px;padding:0 3px}
 .earn{font-size:12.5px;line-height:1.75;color:#cdd3de}
 .earn b{color:#fff}
 .foot{color:#5c6577;font-size:10.5px;margin-top:18px;line-height:1.5}
@@ -40,83 +46,72 @@ button{background:#1b2230;color:#aeb7c9;border:1px solid #2a3448;border-radius:8
 .hist{display:flex;gap:10px;overflow-x:auto;padding:4px 0}
 .hcard{min-width:104px;background:#161b26;border:1px solid #232c3d;border-radius:10px;padding:8px 10px;font-size:11px;color:#8a93a6}
 .hcard b{display:block;font-size:13px;color:#e6e8ee;margin-top:2px}
+#det{position:sticky;top:6px;z-index:5;box-shadow:0 6px 24px rgba(0,0,0,.5);display:none}
+#det .x{float:right;color:#8a93a6;cursor:pointer;padding:0 4px}
+.trend{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
 </style></head><body>
 <div id="lock"><img src="icon-180.png" width="64" height="64" style="border-radius:14px">
 <div style="font-size:17px;font-weight:700">AI六層日報</div>
 <input id="pw" type="password" placeholder="輸入解鎖密碼" autocomplete="current-password">
 <button onclick="unlock()">解鎖</button><div id="lockmsg"></div></div>
 <div id="app" style="display:none">
-<h1><span>AI六層日報</span><select id="dsel" onchange="loadDay(this.value)"></select></h1>
+<h1><span>AI六層日報</span><span style="display:flex;gap:6px;align-items:center"><span class="lab">歷史</span><select id="dsel" onchange="loadDay(this.value)"></select></span></h1>
 <div class="sub" id="sub"></div>
+<input id="q" type="search" placeholder="🔍 搜尋代號（例：SNDK / PLTR）" style="width:100%;margin:4px 0" oninput="srch(this.value)">
+<div class="card" id="det"></div>
 <div class="chips" id="chips"></div>
 <div class="kpi" id="kpi"></div>
-<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px"><h2 style="margin:0">九組強度 · 8日走勢</h2><button id="sbtn" onclick="tg()">排序：中位%</button></div><div id="grows"></div></div>
-<h2>Top 5 ↑ / Bottom 5 ↓</h2><div class="tags" id="tb"></div>
+<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px"><h2 style="margin:0">九組強度 · 撳組名展開成員</h2><button id="sbtn" onclick="tg()">排序：中位%</button></div><div id="grows"></div></div>
+<h2>Top 5 ↑ / Bottom 5 ↓（撳個名睇詳情）</h2><div class="tags" id="tb"></div>
 <h2>缺口監察</h2><div class="card" id="gap" style="font-size:13px"></div>
 <h2>財報節點</h2><div class="card earn" id="earn"></div>
-<h2>近期軌跡</h2><div class="hist" id="hist"></div>
-<div class="foot">只陳述數據形態，非投資建議 · 內容AES-256-GCM加密 · 〔財〕=過去24h放榜 · σ=組內分散度<br><span id="upd"></span></div>
+<h2>近期軌跡</h2><div class="trend" id="trend"></div><div class="hist" id="hist"></div>
+<div class="foot">只陳述數據形態，非投資建議 · 內容AES-256-GCM加密 · 〔財〕=過去24h放榜 · σ=組內分散度 · 收位=(收−低)/(高−低)<br><span id="upd"></span></div>
 </div>
 <script>
 const SALT=Uint8Array.from(atob("Z2A1ADsTMohzmPeJPEV/RQ=="),c=>c.charCodeAt(0));
 const ITER=310000;
-let KEY=null,D=null,mode="med";
+let KEY=null,D=null,mode="med",MAN=null,HIST=null,openG=null;
 const fp=(v,d=2)=>(v>0?"+":"")+v.toFixed(d)+"%";
 const cls=v=>v>0?"pos":(v<0?"neg":"neu");
 async function deriveKey(pw){
  const km=await crypto.subtle.importKey("raw",new TextEncoder().encode(pw),"PBKDF2",false,["deriveKey"]);
  return crypto.subtle.deriveKey({name:"PBKDF2",salt:SALT,iterations:ITER,hash:"SHA-256"},km,{name:"AES-GCM",length:256},true,["decrypt"]);
 }
-async function dec(buf){
- const b=new Uint8Array(buf);
+async function dec(buf){const b=new Uint8Array(buf);
  const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:b.slice(0,12)},KEY,b.slice(12));
- return JSON.parse(new TextDecoder().decode(pt));
-}
-async function fetchEnc(path){
- const r=await fetch(path+"?t="+Date.now());
- if(!r.ok)throw new Error(path);
- return dec(await r.arrayBuffer());
-}
+ return JSON.parse(new TextDecoder().decode(pt));}
+async function fetchEnc(p){const r=await fetch(p+"?t="+Date.now());if(!r.ok)throw new Error(p);return dec(await r.arrayBuffer());}
 async function unlock(){
  const pw=document.getElementById("pw").value.trim().toUpperCase();
  document.getElementById("lockmsg").textContent="";
- try{
-  KEY=await deriveKey(pw);
-  await boot();
+ try{KEY=await deriveKey(pw);await boot();
   const raw=await crypto.subtle.exportKey("raw",KEY);
-  localStorage.setItem("k",btoa(String.fromCharCode(...new Uint8Array(raw))));
+  try{localStorage.setItem("k",btoa(String.fromCharCode(...new Uint8Array(raw))));}catch(e){}
  }catch(e){document.getElementById("lockmsg").textContent="密碼唔啱或者數據載入失敗";KEY=null;}
 }
-async function tryCache(){
- const k=localStorage.getItem("k");
- if(!k)return;
- try{
-  KEY=await crypto.subtle.importKey("raw",Uint8Array.from(atob(k),c=>c.charCodeAt(0)),{name:"AES-GCM"},true,["decrypt"]);
-  await boot();
- }catch(e){KEY=null;localStorage.removeItem("k");}
-}
-let MAN=null,HIST=null;
+async function tryCache(){const k=localStorage.getItem("k");if(!k)return;
+ try{KEY=await crypto.subtle.importKey("raw",Uint8Array.from(atob(k),c=>c.charCodeAt(0)),{name:"AES-GCM"},true,["decrypt"]);await boot();}
+ catch(e){KEY=null;localStorage.removeItem("k");}}
 async function boot(){
- D=await fetchEnc("latest.enc");   // throws if wrong key
+ D=await fetchEnc("latest.enc");
  document.getElementById("lock").style.display="none";
  document.getElementById("app").style.display="block";
  render();
- try{MAN=await (await fetch("manifest.json?t="+Date.now())).json();}catch(e){MAN=null}
- if(MAN){const s=document.getElementById("dsel");
+ try{MAN=await (await fetch("manifest.json?t="+Date.now())).json();
+  const s=document.getElementById("dsel");
   s.innerHTML=MAN.dates.slice().reverse().map(d=>`<option value="${d}">${d.slice(4,6)}/${d.slice(6,8)}</option>`).join("");
- }
+ }catch(e){}
  try{HIST=await fetchEnc("history.enc");renderHist();}catch(e){}
 }
-async function loadDay(d){
- try{D=await fetchEnc("data/"+d+".enc");render();}catch(e){}
-}
-function spark(seq){
+async function loadDay(d){try{D=await fetchEnc("data/"+d+".enc");openG=null;render();}catch(e){}}
+function spark(seq,w=120,h=26){
  if(!seq||seq.length<2)return"";
- const w=120,h=26,vs=seq.map(p=>p.v);
+ const vs=seq.map(p=>p.v!==undefined?p.v:p);
  const mn=Math.min(...vs,0),mx=Math.max(...vs,0),rg=(mx-mn)||1;
- const X=i=>(i/(vs.length-1))*(w-4)+2, Y=v=>h-2-((v-mn)/rg)*(h-4);
+ const X=i=>(i/(vs.length-1))*(w-4)+2,Y=v=>h-2-((v-mn)/rg)*(h-4);
  const pts=vs.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
- return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="height:26px;width:100%">
+ return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="height:${h}px;width:100%">
   <line x1="0" y1="${Y(0)}" x2="${w}" y2="${Y(0)}" stroke="#2a3448" stroke-dasharray="3 3" stroke-width="1"/>
   <polyline points="${pts}" fill="none" stroke="${vs[vs.length-1]>=0?"#4cc38a":"#ff7a6b"}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
 }
@@ -133,8 +128,7 @@ function render(){
  ].map(([l,v,c])=>`<div class="card"><div class="lab">${l}</div><div class="val ${c}">${v}</div></div>`).join("");
  renderRows();
  document.getElementById("tb").innerHTML=
-  D.top.map(x=>`<span class="tag"><b class="pos">${fp(x.c,1)}</b> ${x.t}·${x.g}${x.e?'<span class="e">財</span>':''}</span>`).join("")+
-  D.bot.map(x=>`<span class="tag"><b class="neg">${fp(x.c,1)}</b> ${x.t}·${x.g}${x.e?'<span class="e">財</span>':''}</span>`).join("");
+  D.top.map(x=>tagHtml(x,"pos")).join("")+D.bot.map(x=>tagHtml(x,"neg")).join("");
  document.getElementById("gap").innerHTML=D.gapmon.n?
   `高開>5%共 <b>${D.gapmon.n}</b> 隻｜開→收中位 <b class="${cls(D.gapmon.med)}">${fp(D.gapmon.med)}</b>｜勝率 <b>${D.gapmon.win}%</b><div class="lab" style="margin-top:4px">全宇宙：gap中位 ${fp(D.stats.gap)} → 開→收中位 ${fp(D.stats.o2c)}，升家 ${D.stats.up}%</div>`
   :"今日無>5%高開";
@@ -144,24 +138,55 @@ function render(){
   `<b>今晚已出</b>（未反映，快照）：${j(D.earn.tonight)}<br>`+
   `<b>下一交易日</b>（${D.earn.nx}）：盤前 ${j(D.earn.nxt_pre)}；盤後 ${j(D.earn.nxt_aft)}`;
  document.getElementById("upd").textContent="數據日："+D.date;
- if(document.getElementById("dsel").value!==D.date.replaceAll("-",""))
-  {const s=document.getElementById("dsel");for(const o of s.options){if(o.value===D.date.replaceAll("-","")){s.value=o.value;break}}}
+ const s=document.getElementById("dsel");
+ for(const o of s.options){if(o.value===D.date.replaceAll("-","")){s.value=o.value;break}}
 }
+function tagHtml(x,c){return `<span class="tag" onclick="showT('${x.t}')"><b class="${c}">${fp(x.c,1)}</b> ${x.t}·${x.g}${x.e?'<span class=e>財</span>':''}</span>`}
 function renderRows(){
  const gs=[...D.groups].sort((a,b)=>mode==="med"?b.med-a.med:b.sig-a.sig);
  document.getElementById("grows").innerHTML=gs.map(g=>{
   const w=(g.sig>4||g.sig>Math.abs(g.med)*3)?" ⚠":"";
-  return `<div class="grow"><div class="gname">${g.name}</div>${spark(D.ghist[g.g])}
+  const open=openG===g.g;
+  const mem=(D.members&&D.members[g.g]||[]).map(m=>
+   `<span class="mchip" onclick="event.stopPropagation();showT('${m.t}')">${m.t} <b class="${cls(m.c)}">${fp(m.c,1)}</b>${m.e?'<span class=e>財</span>':''}</span>`).join("");
+  return `<div class="grow" onclick="tgG('${g.g}')"><div class="row"><span class="caret">${open?"▼":"▶"}</span><div class="gname">${g.name}</div>${spark(D.ghist[g.g])}
    <div class="gmed ${cls(g.med)}">${fp(g.med)}</div>
-   <div class="gsub">升家${g.up}% 收位${g.rp.toFixed(2)}<br>σ${g.sig.toFixed(1)}${w}</div></div>`;
+   <div class="gsub">升家${g.up}% 收位${g.rp.toFixed(2)}<br>σ${g.sig.toFixed(1)}${w}</div></div>
+   <div class="mem${open?" open":""}">${mem}</div></div>`;
  }).join("");
  document.getElementById("sbtn").textContent=mode==="med"?"排序：中位%":"排序：σ分散度";
 }
-function tg(){mode=mode==="med"?"sig":"med";renderRows()}
+function tgG(g){openG=(openG===g)?null:g;renderRows();}
+function tg(){mode=mode==="med"?"sig":"med";renderRows();event.stopPropagation();}
+function findM(t){for(const g in (D.members||{})){const m=(D.members[g]||[]).find(x=>x.t===t);if(m)return {...m,g};}return null;}
+function showT(t){
+ const m=findM(t);const d=document.getElementById("det");
+ if(!m){d.style.display="none";return;}
+ const sh=(D.sh&&D.sh[t])||[];
+ d.innerHTML=`<span class="x" onclick="document.getElementById('det').style.display='none'">✕</span>
+  <b>${t}</b> <span class="lab">${m.g}</span>${m.e?'<span class="e" style="font-size:11px;margin-left:4px">過去24h放榜</span>':''}
+  <div style="display:flex;gap:14px;align-items:center;margin-top:6px">
+   <div><div class="lab">當日</div><div class="val ${cls(m.c)}" style="font-size:16px">${fp(m.c,1)}</div></div>
+   <div><div class="lab">開盤缺口</div><div class="val ${cls(m.gp)}" style="font-size:16px">${fp(m.gp,1)}</div></div>
+   <div><div class="lab">收位</div><div class="val" style="font-size:16px">${m.rp.toFixed(2)}</div></div>
+   <div style="flex:1">${spark(sh,120,30)}</div></div>
+  <div class="lab" style="margin-top:4px">走勢=近${sh.length}個交易日每日%</div>`;
+ d.style.display="block";window.scrollTo({top:0,behavior:"smooth"});
+}
+function srch(q){
+ q=q.trim().toUpperCase();
+ if(q.length>=1&&findM(q)){showT(q);}
+ else if(!q){document.getElementById("det").style.display="none";}
+}
 function renderHist(){
  if(!HIST||!HIST.length)return;
  document.getElementById("hist").innerHTML=HIST.slice(-14).reverse().map(h=>
   `<div class="hcard">${h.date.slice(5)}<b class="${cls(h.spy)}">SPY ${fp(h.spy)}</b>缺口勝率 ${h.gapn?h.gapwin+"%":"—"}<br>差 ${fp(h.capdiff,2)}pp</div>`).join("");
+ if(HIST.length>=3){
+  const t=document.getElementById("trend");
+  t.innerHTML=`<div class="card"><div class="lab">缺口勝率%（日）</div>${spark(HIST.map(h=>h.gapn?h.gapwin:0),140,34)}</div>
+   <div class="card"><div class="lab">capex−軟件差 pp（日）</div>${spark(HIST.map(h=>h.capdiff),140,34)}</div>`;
+ }
 }
 document.getElementById("pw").addEventListener("keydown",e=>{if(e.key==="Enter")unlock()});
 tryCache();
