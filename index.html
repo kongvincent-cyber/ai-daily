@@ -188,7 +188,8 @@ function drawTickChart(){
  if(!LASTC)return;
  document.getElementById("tchart").innerHTML=candleSvg(LASTC.ohlc,536,190,maPick(LASTC.ma))+
   `<div class="lab" style="margin-top:4px">${maLeg()} · YTD ${LASTC.dates[0]}→${LASTC.dates[LASTC.dates.length-1]}
-   <button style="margin-left:8px" onclick="MASET=MASET==='std'?'alt':'std';drawTickChart()">MA: ${MASET==="std"?"20/50/200":"10/100/200"} ⇄</button></div>`;
+   <button style="margin-left:8px" onclick="MASET=MASET==='std'?'alt':'std';drawTickChart()">MA: ${MASET==="std"?"20/50/200":"10/100/200"} ⇄</button></div>`+
+  ((!(D.eps&&D.eps[LASTC.t])&&LASTC.eps&&LASTC.eps.last)?`<div class="lab" style="margin-top:4px;cursor:pointer;border-bottom:1px dotted #5c6577;display:inline-block" onclick="showEPS('${LASTC.t}')">Last earnings ${LASTC.eps.last.d}: ${fmt$(LASTC.eps.last.act)} vs ${fmt$(LASTC.eps.last.est)} (${LASTC.eps.last.sp}%)${LASTC.eps.up&&LASTC.eps.up.est!=null?` · next est ${fmt$(LASTC.eps.up.est)}`:""} — tap</div>`:"");
 }
 async function showT(t){
  const m=findM(t);const d=document.getElementById("det");
@@ -238,8 +239,8 @@ function candleSvg(cs,W=536,H=200,ma=null){
   s+=`<line x1="${cx.toFixed(1)}" x2="${cx.toFixed(1)}" y1="${Y(x.h).toFixed(1)}" y2="${Y(x.l).toFixed(1)}" stroke="${col}" stroke-width="0.8"/>`;
   const y1=Y(Math.max(x.o,x.c)),y2=Y(Math.min(x.o,x.c));
   s+=`<rect x="${(cx-Math.max(bw*0.33,0.9)).toFixed(1)}" y="${y1.toFixed(1)}" width="${Math.max(bw*0.66,1.8).toFixed(1)}" height="${Math.max(y2-y1,0.9).toFixed(1)}" fill="${col}"/>`;});
- if(ma){const MC={m20:"#ffd479",m50:"#6ea8fe",m200:"#e6e8ee"};
-  for(const k of ["m20","m50","m200"]){
+ if(ma){const MC={m10:"#ffd479",m20:"#ffd479",m50:"#6ea8fe",m100:"#6ea8fe",m200:"#e6e8ee"};
+  for(const k of Object.keys(ma)){
    const a=ma[k]||[];let pts=[];
    a.forEach((v,i)=>{if(v!=null)pts.push(`${(5+i*bw+bw/2).toFixed(1)},${Y(v).toFixed(1)}`);});
    if(pts.length>1)s+=`<polyline points="${pts.join(" ")}" fill="none" stroke="${MC[k]}" stroke-width="1.1" opacity="0.9"/>`;
@@ -308,8 +309,10 @@ function epsLine(t){
  return "";
 }
 function fmt$(v){if(v==null||v==="")return "—";const s=String(v);return s.startsWith("$")||s.startsWith("(")?s:"$"+s;}
-function showEPS(t){
+async function showEPS(t){
  const e=(D.eps||{})[t], est=(D.ests||{})[t];
+ let ce=null;
+ if(!e){try{const C=(LASTC&&LASTC.t===t)?LASTC:await fetchEnc("charts/"+t+".enc");ce=C&&C.eps?C.eps:null;}catch(_){}}
  let body="";
  if(e){
   const sp=parseFloat(e.sp);
@@ -321,7 +324,20 @@ function showEPS(t){
     return `<tr><td style="padding:2px 0;color:#8a93a6">${x.q}</td><td>est ${fmt$(x.est)}</td><td>act ${fmt$(x.act)}</td><td class="${isNaN(s)?"neu":(s>=0?"pos":"neg")}" style="text-align:right">${x.sp!=null?x.sp+"%":"—"}</td></tr>`;}).join("")}</table>`;
   }
  }else if(est){
-  body=`<div style="font-size:13.5px;margin:6px 0">Not reported yet · consensus est <b>${fmt$(est)}</b></div><div class="lab">After it reports, this panel shows actual vs est + surprise% + 4-quarter track.</div>`;
+  body=`<div style="font-size:13.5px;margin:6px 0">Not reported yet · consensus est <b>${fmt$(est)}</b></div>`+
+   (ce&&ce.last?`<div class="lab">Previous quarter (${ce.last.q}, ${ce.last.d}): actual ${fmt$(ce.last.act)} vs est ${fmt$(ce.last.est)} → ${ce.last.sp}%</div>`:"")+
+   `<div class="lab">After it reports, this panel shows actual vs est + surprise% + 4-quarter track.</div>`;
+ }else if(ce&&ce.last){
+  const sp=parseFloat(ce.last.sp);
+  body=`<div style="font-size:13.5px;margin:6px 0">Last reported ${ce.last.d} · Q ${ce.last.q}<br>
+   <b>Actual ${fmt$(ce.last.act)}</b> vs est ${fmt$(ce.last.est)} → surprise <b class="${isNaN(sp)?"neu":(sp>=0?"pos":"neg")}">${ce.last.sp!=null?ce.last.sp+"%":"—"}</b></div>`;
+  if(ce.hist&&ce.hist.length>1){
+   body+=`<div class="lab" style="margin:6px 0 3px">Last ${ce.hist.length} quarters:</div>
+   <table style="width:100%;font-size:12px;border-collapse:collapse">${ce.hist.map(x=>{const s=parseFloat(x.sp);
+    return `<tr><td style="padding:2px 0;color:#8a93a6">${x.q}</td><td>est ${fmt$(x.est)}</td><td>act ${fmt$(x.act)}</td><td class="${isNaN(s)?"neu":(s>=0?"pos":"neg")}" style="text-align:right">${x.sp!=null?x.sp+"%":"—"}</td></tr>`;}).join("")}</table>`;
+  }
+  if(ce.up&&ce.up.est!=null)body+=`<div class="lab" style="margin-top:6px">Next: Q ${ce.up.q} · consensus est <b>${fmt$(ce.up.est)}</b></div>`;
+  body+=`<div class="lab" style="margin-top:4px">Archive meta — refreshed weekly, not a live print.</div>`;
  }else{
   body=`<div class="lab" style="margin-top:6px">No analyst estimates exist for this name — typical for small caps, recent IPOs and thin-coverage ADRs (zero or near-zero analysts). This is the data's truth, not an app error. If Nasdaq logs the reported number after release, actuals will still appear here.</div>`;
  }
