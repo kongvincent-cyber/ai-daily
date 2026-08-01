@@ -64,7 +64,7 @@ button{background:#1b2230;color:#aeb7c9;border:1px solid #2a3448;border-radius:8
 <div class="kpi" id="kpi"></div>
 <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px"><h2 style="margin:0">Group strength · tap a row to expand</h2><button id="sbtn" onclick="tg(event)">Sort: median %</button></div><div id="grows"></div></div>
 <h2>Top 5 ↑ / Bottom 5 ↓ · tap for detail</h2><div class="tags" id="tb"></div>
-<h2>Gap monitor</h2><div class="card" id="gap" style="font-size:13px"></div>
+<h2>Gap monitor <span style="color:#5c6577;font-weight:400;font-size:11px">· tap for meaning</span></h2><div class="card" id="gap" style="font-size:13px;cursor:pointer" onclick="showGap()"></div>
 <h2>Earnings nodes</h2><div class="card earn" id="earn"></div>
 <h2>Recent track</h2><div class="trend" id="trend"></div><div class="hist" id="hist"></div>
 <div class="foot">Data patterns only — not investment advice · AES-256-GCM encrypted · <span class="e">E</span> = reported within past 24h · σ = intra-group dispersion · pos = (close−low)/(high−low)<br><span id="upd"></span></div>
@@ -137,8 +137,8 @@ function render(){
  const wd=new Date(D.date+"T12:00:00Z").toLocaleDateString("en-US",{weekday:"short"});
  document.getElementById("sub").textContent=`${D.date} (${wd}) · universe 249`+(D.miss.length?` · ${D.miss.length} missing`:"");
  document.getElementById("chips").innerHTML=
-  `<span class="chip">${charTxt()}</span>`+
-  `<span class="chip">${D.regime==="牛"?"Bull":"Bear"} · SPY vs 200DMA ${fp(D.spy.ma200,1)}</span>`+
+  `<span class="chip" style="cursor:pointer" onclick="showChar()">${charTxt()} <span style="color:#5c6577">ⓘ</span></span>`+
+  `<span class="chip" style="cursor:pointer" onclick="showRegime()">${D.regime==="牛"?"Bull":"Bear"} · SPY vs 200DMA ${fp(D.spy.ma200,1)} <span style="color:#5c6577">ⓘ</span></span>`+
   (D.lead3.length?`<span class="chip">3-day leaders: ${D.lead3.map(g=>GN[g]||g).join(", ")}</span>`:"");
  document.getElementById("kpi").innerHTML=[
   ["SPY",fp(D.spy.chg),cls(D.spy.chg)],["QQQ",fp(D.qqq),cls(D.qqq)],
@@ -209,6 +209,35 @@ function renderHist(){
   t.innerHTML=`<div class="card"><div class="lab">Gap win rate % (daily)</div>${spark(HIST.map(h=>h.gapn?h.gapwin:0),140,34)}</div>
    <div class="card"><div class="lab">Capex − Software pp (daily)</div>${spark(HIST.map(h=>h.capdiff),140,34)}</div>`;
  }
+}
+
+function panel(html){const d=document.getElementById("det");d.innerHTML=`<span class="x" onclick="document.getElementById('det').style.display='none'">✕</span>`+html;d.style.display="block";window.scrollTo({top:0,behavior:"smooth"});}
+function showChar(){
+ const s=D.stats;
+ const rows=[
+  ["Broad advance","≥70% of names up",D.charc==="broad_adv"],
+  ["Broad decline","≤30% of names up",D.charc==="broad_dec"],
+  ["Gap-up, faded into close","median gap >+0.4% AND open→close <−0.2%",D.charc==="gap_fade"],
+  ["Gap-down, recovered","median gap <−0.4% AND open→close >+0.2%",D.charc==="dip_recover"],
+  ["Split / rotation","none of the above",D.charc==="split"]];
+ panel(`<b>Market character — what it means</b>
+  <div class="lab" style="margin:6px 0 4px">Computed across all 249 universe names (NOT the index): take each stock's <b>open gap</b> (open vs prior close) and <b>open→close</b> move, then use the medians.</div>
+  <div style="font-size:13px;margin:6px 0">Today: median gap <b class="${cls(s.gap)}">${fp(s.gap)}</b> · median open→close <b class="${cls(s.o2c)}">${fp(s.o2c)}</b> · advancers <b>${s.up}%</b></div>
+  <div class="lab">Rules (today's highlighted):</div>
+  <div style="font-size:12px;line-height:1.7">${rows.map(([n,r,hit])=>`<div style="${hit?'color:#ffd479':''}">${hit?"▶":"·"} <b>${n}</b> — ${r}</div>`).join("")}</div>
+  <div class="lab" style="margin-top:8px">How to read: the index (SPY/QQQ) tells you how much the market moved; character tells you <b>how</b> it moved; the Gap monitor tells you what happened to the extreme gappers. Example 07-31: SPY +0.7% but the typical AI name opened +2.5% and bled −2.2% — an up-index, down-army day.</div>
+  <div class="lab" style="margin-top:4px">Leaders = the 2 groups with the highest median day % that session.</div>`);
+}
+function showRegime(){
+ panel(`<b>Regime — the master risk switch</b>
+  <div class="lab" style="margin-top:6px">SPY above its 200-day moving average = <b>Bull</b>; below = <b>Bear</b>. In the research framework behind this app, new entries are only taken in Bull regime — regime beats position size beats price stops. The % shown is SPY's distance above/below the 200DMA (today ${fp(D.spy.ma200,1)}), i.e. how much cushion the regime has before flipping.</div>`);
+}
+function showGap(){
+ const g=D.gapmon;
+ panel(`<b>Gap monitor — chase-the-open thermometer</b>
+  <div class="lab" style="margin-top:6px">Every universe name that opened >5% above the prior close. We track their <b>open→close</b> return and win rate (close above open). Healthy accumulation: gappers hold their gains. Distribution: they fade all day.</div>
+  <div style="font-size:13px;margin:6px 0">Today: ${g.n?`<b>${g.n}</b> names · open→close median <b class="${cls(g.med)}">${fp(g.med)}</b> · win rate <b>${g.win}%</b>`:"no >5% gap-ups"}</div>
+  <div class="lab">Reference base rate (2026-07-31 audit): 58 gappers, median −5.22%, win rate 3% — chasing opens was toxic. If this win rate holds above ~50% for several days, the tape's character has genuinely changed.</div>`);
 }
 document.getElementById("pw").addEventListener("keydown",e=>{if(e.key==="Enter")unlock()});
 tryCache();
