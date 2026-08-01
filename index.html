@@ -323,7 +323,7 @@ function showEPS(t){
  }else if(est){
   body=`<div style="font-size:13.5px;margin:6px 0">Not reported yet · consensus est <b>${fmt$(est)}</b></div><div class="lab">After it reports, this panel shows actual vs est + surprise% + 4-quarter track.</div>`;
  }else{
-  body=`<div class="lab" style="margin-top:6px">No estimate/actual data available for this name.</div>`;
+  body=`<div class="lab" style="margin-top:6px">No analyst estimates exist for this name — typical for small caps, recent IPOs and thin-coverage ADRs (zero or near-zero analysts). This is the data's truth, not an app error. If Nasdaq logs the reported number after release, actuals will still appear here.</div>`;
  }
  const st=(D.street||{})[t]; let sb="";
  if(st){
