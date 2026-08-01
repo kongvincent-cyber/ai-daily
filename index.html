@@ -161,14 +161,14 @@ function render(){
  const s=document.getElementById("dsel");
  for(const o of s.options){if(o.value===D.date.replaceAll("-","")){s.value=o.value;break}}
 }
-function tagHtml(x,c){return `<span class="tag" onclick="showT('${x.t}')"><b class="${c}">${fp(x.c,1)}</b> ${x.t}${x.e?'<span class="e">E</span>':''}<small>${short(nm(x.t),14)} · ${x.g}</small></span>`}
+function tagHtml(x,c){return `<span class="tag" onclick="showT('${x.t}')"><b class="${c}">${fp(x.c,1)}</b> ${x.t}${x.e?`<span class="e" onclick="event.stopPropagation();showEPS('${x.t}')">E</span>`:''}<small>${short(nm(x.t),14)} · ${x.g}</small></span>`}
 function renderRows(){
  const gs=[...D.groups].sort((a,b)=>mode==="med"?b.med-a.med:b.sig-a.sig);
  document.getElementById("grows").innerHTML=gs.map(g=>{
   const w=(g.sig>4||g.sig>Math.abs(g.med)*3)?" ⚠":"";
   const open=openG===g.g;
   const mem=(D.members&&D.members[g.g]||[]).map(m=>
-   `<span class="mchip" onclick="event.stopPropagation();showT('${m.t}')">${m.t} <b class="${cls(m.c)}">${fp(m.c,1)}</b>${m.e?'<span class="e">E</span>':''}<small>${short(nm(m.t),16)}</small></span>`).join("");
+   `<span class="mchip" onclick="event.stopPropagation();showT('${m.t}')">${m.t} <b class="${cls(m.c)}">${fp(m.c,1)}</b>${m.e?`<span class="e" onclick="event.stopPropagation();showEPS('${m.t}')">E</span>`:''}<small>${short(nm(m.t),16)}</small></span>`).join("");
   return `<div class="grow" onclick="tgG('${g.g}')"><div class="row"><span class="caret">${open?"▼":"▶"}</span><div class="gname">${GN[g.g]||g.name}</div>${spark(D.ghist[g.g])}
    <div class="gmed ${cls(g.med)}">${fp(g.med)}</div>
    <div class="gsub">adv ${g.up}% · pos ${g.rp.toFixed(2)}<br>σ ${g.sig.toFixed(1)}${w}</div></div>
@@ -195,7 +195,7 @@ async function showT(t){
  if(!m){d.style.display="none";return;}
  const sh=(D.sh&&D.sh[t])||[];
  d.innerHTML=`<span class="x" onclick="document.getElementById('det').style.display='none'">✕</span>
-  <b>${t}</b> <span style="color:#aeb7c9">${nm(t)}</span> <span class="lab">${GN[m.g]||m.g}</span>${m.e?'<span class="e">reported past 24h</span>':''}
+  <b>${t}</b> <span style="color:#aeb7c9">${nm(t)}</span> <span class="lab">${GN[m.g]||m.g}</span>${m.e?`<span class="e" style="cursor:pointer" onclick="showEPS('${t}')">reported past 24h — tap for est vs actual</span>`:''}
   <div style="display:flex;gap:14px;align-items:center;margin-top:6px">
    <div><div class="lab">Day</div><div class="val ${cls(m.c)}" style="font-size:16px">${fp(m.c,1)}</div></div>
    <div><div class="lab">Open gap</div><div class="val ${cls(m.gp)}" style="font-size:16px">${fp(m.gp,1)}</div></div>
@@ -299,6 +299,27 @@ async function showBurst(){const S=await ensureSer();
  ${twoLine(S.up4,S.dn4)}
  <div class="lab" style="margin:4px 0">Today: <b class="pos">${S.up4[S.up4.length-1]}</b> bursts vs <b class="neg">${S.dn4[S.dn4.length-1]}</b> breakdowns</div>
  <div class="lab" style="margin-top:6px">Complementary read: bursts = "is institutional money buying somewhere today?" (environment). The Gap card = "does chasing the open pay?" (execution). Both green together = confirmed healthy tape.</div>`);}
+function fmt$(v){if(v==null||v==="")return "—";const s=String(v);return s.startsWith("$")||s.startsWith("(")?s:"$"+s;}
+function showEPS(t){
+ const e=(D.eps||{})[t], est=(D.ests||{})[t];
+ let body="";
+ if(e){
+  const sp=parseFloat(e.sp);
+  body=`<div style="font-size:13.5px;margin:6px 0">Quarter ${e.q} · reported ${e.d}<br>
+   <b>Actual ${fmt$(e.act)}</b> vs est ${fmt$(e.est)} → surprise <b class="${isNaN(sp)?"neu":(sp>=0?"pos":"neg")}">${e.sp!=null?e.sp+"%":"—"}</b></div>`;
+  if(e.hist&&e.hist.length>1){
+   body+=`<div class="lab" style="margin:6px 0 3px">Last ${e.hist.length} quarters (beat/miss track):</div>
+   <table style="width:100%;font-size:12px;border-collapse:collapse">${e.hist.map(x=>{const s=parseFloat(x.sp);
+    return `<tr><td style="padding:2px 0;color:#8a93a6">${x.q}</td><td>est ${fmt$(x.est)}</td><td>act ${fmt$(x.act)}</td><td class="${isNaN(s)?"neu":(s>=0?"pos":"neg")}" style="text-align:right">${x.sp!=null?x.sp+"%":"—"}</td></tr>`;}).join("")}</table>`;
+  }
+ }else if(est){
+  body=`<div style="font-size:13.5px;margin:6px 0">Not reported yet · consensus est <b>${fmt$(est)}</b></div><div class="lab">After it reports, this panel shows actual vs est + surprise% + 4-quarter track.</div>`;
+ }else{
+  body=`<div class="lab" style="margin-top:6px">No estimate/actual data available for this name.</div>`;
+ }
+ panel(`<b>${t}</b> <span style="color:#aeb7c9">${nm(t)}</span> <span class="lab">earnings: est vs actual</span>${body}
+ <div class="lab" style="margin-top:6px">Source: Nasdaq consensus & reported EPS · surprise% = (act−est)/|est|</div>`);
+}
 function panel(html){const d=document.getElementById("det");d.innerHTML=`<span class="x" onclick="document.getElementById('det').style.display='none'">✕</span>`+html;d.style.display="block";window.scrollTo({top:0,behavior:"smooth"});}
 function showChar(){
  const s=D.stats;
