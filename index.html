@@ -156,6 +156,7 @@ function render(){
  document.getElementById("earn").innerHTML=
   `<b>Already out</b> (in today's price) — pre-market: ${decorate(D.earn.today_pre)}; yesterday: ${decorate(D.earn.prev)}<br>`+
   `<b>Tonight after close</b> (not yet priced, snapshot): ${decorate(D.earn.tonight)}<br>`+
+  ((D.earn.unk&&D.earn.unk.length)?`<b>Reported today · timing unconfirmed°</b> (calendar gave no time; likely already out pre-market): ${decorate(D.earn.unk)}<br>`:``)+
   `<b>Next session</b> (${D.earn.nx}) — pre: ${decorate(D.earn.nxt_pre)}; after: ${decorate(D.earn.nxt_aft)}`;
  document.getElementById("upd").textContent="Data date: "+D.date;
  const s=document.getElementById("dsel");
