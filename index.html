@@ -135,7 +135,7 @@ function decorate(list){ // "PLTR(L6) 盤後+8%（快照）" → "PLTR Palantir 
 }
 function render(){
  const wd=new Date(D.date+"T12:00:00Z").toLocaleDateString("en-US",{weekday:"short"});
- document.getElementById("sub").textContent=`${D.date} (${wd}) · universe 249`+(D.miss.length?` · ${D.miss.length} missing`:"");
+ document.getElementById("sub").textContent=`${D.date} (${wd}) · universe ${D.usize||249}`+(D.miss.length?` · ${D.miss.length} missing`:"");
  document.getElementById("chips").innerHTML=
   `<span class="chip" style="cursor:pointer" onclick="showChar()">${charTxt()} <span style="color:#5c6577">ⓘ</span></span>`+
   `<span class="chip" style="cursor:pointer" onclick="showRegime()">${D.regime==="牛"?"Bull":"Bear"} · SPY vs 200DMA ${fp(D.spy.ma200,1)} <span style="color:#5c6577">ⓘ</span></span>`+
