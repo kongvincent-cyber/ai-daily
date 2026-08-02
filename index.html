@@ -153,7 +153,8 @@ function render(){
     <div class="lab">⊕ Theme tag · ${tg.en} <span style="color:#5c6577">(${tg.n} names, cross-layer) — tap for members</span></div>
     <div class="val ${cls(tg.med)}" style="font-size:15px">${fp(tg.med)} <span style="font-size:11px;color:#aeb7c9;font-weight:400">median · advancers ${tg.up}%</span></div>
     <div id="tagx${i}" style="display:none;margin-top:6px">
-      <div class="lab" style="margin-bottom:4px">Agent control + cost observability + token/gateway middleware + data governance — one cross-layer control-plane cohort. Layers stay untouched; this is an overlay lens.</div>
+      <div class="lab" style="margin-bottom:4px">${tg.k==="CTRL"?"Agent control + cost observability + token/gateway middleware + data governance — one cross-layer control-plane cohort.":"Merchant co-packaged optics / AI optical interconnect chain (excl. AVGO/NVDA/TSM to keep the signal pure)."} Layers untouched — overlay lens. Chart: cohort vs Capex vs Software blocs, YTD.</div>
+      <div id="tagc${i}" style="margin-top:2px"></div>
       <div style="display:flex;flex-wrap:wrap;gap:5px">${tg.members.map(m=>`<span class="mchip" onclick="event.stopPropagation();showT('${m}')">${m}<small>${(tg.note&&tg.note[m])||""}</small></span>`).join("")}</div>
     </div></div>`).join(""):"";
  renderRows();
@@ -186,7 +187,24 @@ function renderRows(){
  }).join("");
  document.getElementById("sbtn").textContent=mode==="med"?"Sort: median %":"Sort: σ dispersion";
 }
-function tgTag(i){const e=document.getElementById("tagx"+i);e.style.display=e.style.display==="none"?"block":"none";}
+async function tgTag(i){const e=document.getElementById("tagx"+i);const open=e.style.display==="none";e.style.display=open?"block":"none";
+ if(open&&!e.dataset.c){e.dataset.c="1";
+  try{const S=await ensureSer();const tg=D.tags[i];
+   const a=S.tagix&&S.tagix[tg.k],b=S.capix,c=S.swix;
+   if(a&&b&&c)document.getElementById("tagc"+i).innerHTML=triLine(a,b,c)+
+    `<div class="lab" style="margin:4px 0 6px"><span style="color:#ffd479">━</span> ${tg.en} ${fp(lastN(a),1)} · <span style="color:#6ea8fe">━</span> Capex bloc ${fp(lastN(b),1)} · <span style="color:#4cc38a">━</span> Software bloc ${fp(lastN(c),1)} <span style="color:#5c6577">(YTD, equal-weight median)</span></div>`;
+  }catch(err){}}}
+function lastN(s){for(let j=s.length-1;j>=0;j--)if(s[j]!=null)return s[j];return 0}
+function triLine(a,b,c,W=536,H=150){
+ const all=[...a,...b,...c].filter(v=>v!=null);
+ const hi=Math.max(...all,1),lo=Math.min(...all,0);
+ const X=i=>5+(i/(Math.max(a.length,2)-1))*(W-10),Y=v=>5+(hi-v)/((hi-lo)||1)*(H-10);
+ const p=s=>s.map((v,i)=>v==null?null:`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).filter(Boolean).join(" ");
+ return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:#10151f;border-radius:8px">
+ <line x1="5" x2="${W-5}" y1="${Y(0).toFixed(1)}" y2="${Y(0).toFixed(1)}" stroke="#2a3350" stroke-dasharray="3,3"/>
+ <polyline points="${p(b)}" fill="none" stroke="#6ea8fe" stroke-width="1.3"/>
+ <polyline points="${p(c)}" fill="none" stroke="#4cc38a" stroke-width="1.3"/>
+ <polyline points="${p(a)}" fill="none" stroke="#ffd479" stroke-width="1.8"/></svg>`;}
 function tgG(g){openG=(openG===g)?null:g;renderRows();}
 function tg(ev){mode=mode==="med"?"sig":"med";renderRows();if(ev)ev.stopPropagation();}
 function findM(t){for(const g in (D.members||{})){const m=(D.members[g]||[]).find(x=>x.t===t);if(m)return {...m,g};}return null;}
