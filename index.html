@@ -204,6 +204,7 @@ async function showT(t){
    <div><div class="lab">Close pos</div><div class="val" style="font-size:16px">${m.rp.toFixed(2)}</div></div>
   </div>
   ${epsLine(t)}
+  ${(D.wp&&D.wp[t])?`<div style="margin-top:8px;padding:8px;border:1px solid #2a3350;border-radius:8px"><div class="lab" style="margin-bottom:4px">⚑ Earnings watch — beyond EPS (next session)</div>${D.wp[t].map((w,i)=>`<div style="font-size:12.5px;line-height:1.5">${i+1}. ${w}</div>`).join("")}</div>`:``}
   <div id="tchart" style="margin-top:8px">${spark(sh,120,30)}<div class="lab">loading YTD chart…</div></div>`;
  d.style.display="block";window.scrollTo({top:0,behavior:"smooth"});
  try{LASTC=await fetchEnc("charts/"+t+".enc");drawTickChart();}
