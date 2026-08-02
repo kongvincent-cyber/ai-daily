@@ -62,6 +62,7 @@ button{background:#1b2230;color:#aeb7c9;border:1px solid #2a3448;border-radius:8
 <div class="card" id="det"></div>
 <div class="chips" id="chips"></div>
 <div class="kpi" id="kpi"></div>
+<div id="ttags"></div>
 <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px"><h2 style="margin:0">Group strength · tap a row to expand</h2><button id="sbtn" onclick="tg(event)">Sort: median %</button></div><div id="grows"></div></div>
 <h2>Top 5 ↑ / Bottom 5 ↓ · tap for detail</h2><div class="tags" id="tb"></div>
 <h2>Gap monitor <span style="color:#5c6577;font-weight:400;font-size:11px">· tap for meaning</span></h2><div class="card" id="gap" style="font-size:13px;cursor:pointer" onclick="showGap()"></div>
@@ -147,6 +148,14 @@ function render(){
   ["Gap win rate (>5% gap-ups)",D.gapmon.n?D.gapmon.win+"% ("+D.gapmon.n+" names)":"none",D.gapmon.n&&D.gapmon.win<30?"neg":"neu","showGap"],
   ["4% bursts (Pradeep)",(D.up4!==undefined?`${D.up4}↑ / ${D.dn4}↓`:"tap"),(D.up4!==undefined&&D.up4>=D.dn4)?"pos":"neg","showBurst"]
  ].map(([l,v,c,f])=>`<div class="card" style="cursor:pointer" onclick="${f}()"><div class="lab">${l} <span style="color:#5c6577">ⓘ</span></div><div class="val ${c}">${v}</div></div>`).join("");
+ document.getElementById("ttags").innerHTML=(D.tags&&D.tags.length)?D.tags.map((tg,i)=>
+  `<div class="card" style="margin:8px 0;cursor:pointer" onclick="tgTag(${i})">
+    <div class="lab">⊕ Theme tag · ${tg.en} <span style="color:#5c6577">(${tg.n} names, cross-layer) — tap for members</span></div>
+    <div class="val ${cls(tg.med)}" style="font-size:15px">${fp(tg.med)} <span style="font-size:11px;color:#aeb7c9;font-weight:400">median · advancers ${tg.up}%</span></div>
+    <div id="tagx${i}" style="display:none;margin-top:6px">
+      <div class="lab" style="margin-bottom:4px">Agent control + cost observability + token/gateway middleware + data governance — one cross-layer control-plane cohort. Layers stay untouched; this is an overlay lens.</div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px">${tg.members.map(m=>`<span class="mchip" onclick="event.stopPropagation();showT('${m}')">${m}<small>${(tg.note&&tg.note[m])||""}</small></span>`).join("")}</div>
+    </div></div>`).join(""):"";
  renderRows();
  document.getElementById("tb").innerHTML=
   D.top.map(x=>tagHtml(x,"pos")).join("")+D.bot.map(x=>tagHtml(x,"neg")).join("");
@@ -177,6 +186,7 @@ function renderRows(){
  }).join("");
  document.getElementById("sbtn").textContent=mode==="med"?"Sort: median %":"Sort: σ dispersion";
 }
+function tgTag(i){const e=document.getElementById("tagx"+i);e.style.display=e.style.display==="none"?"block":"none";}
 function tgG(g){openG=(openG===g)?null:g;renderRows();}
 function tg(ev){mode=mode==="med"?"sig":"med";renderRows();if(ev)ev.stopPropagation();}
 function findM(t){for(const g in (D.members||{})){const m=(D.members[g]||[]).find(x=>x.t===t);if(m)return {...m,g};}return null;}
