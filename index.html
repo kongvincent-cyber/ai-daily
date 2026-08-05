@@ -61,6 +61,7 @@ button{background:#1b2230;color:#aeb7c9;border:1px solid #2a3448;border-radius:8
 <input id="q" type="search" placeholder="🔍 Search ticker or name (e.g. SNDK / Palantir)" style="width:100%;margin:4px 0" oninput="srch(this.value)">
 <div class="card" id="det"></div>
 <div class="chips" id="chips"></div>
+<div id="strike"></div>
 <div class="kpi" id="kpi"></div>
 <div id="ttags"></div>
 <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px"><h2 style="margin:0">Group strength · tap a row to expand</h2><button id="sbtn" onclick="tg(event)">Sort: median %</button></div><div id="grows"></div></div>
@@ -134,6 +135,35 @@ function decorate(list){ // "PLTR(L6) 盤後+8%（快照）" → "PLTR Palantir 
   return `<span style="cursor:pointer;border-bottom:1px dotted #5c6577" onclick="showEPS('${m[1]}')">${m[1]}</span> <small style="color:#8a93a6">${short(nm(m[1]),12)}</small>(${m[2]})${rest}`;
  }).join("、 ");
 }
+function renderStrike(){
+ const el=document.getElementById("strike");if(!el)return;
+ const P=D.picks;
+ if(!P||!P.picks){el.innerHTML="";return;}
+ const gate=(P.regime&&P.regime.gate)||"正常";
+ const gc=gate==="正常"?"#4cc38a":(gate==="減注"?"#ffd479":"#ff7a6b");
+ const gt=gate==="正常"?"Regime OK":(gate==="減注"?"Reduce size 減注":"HALT 停手");
+ el.innerHTML=`<div class="card" style="border-color:#5c4a1e;background:linear-gradient(180deg,#1c170e,#161b26);margin:10px 0">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+   <b style="font-size:14px;color:#ffd479">⚔ Today's strike plan · 今日出擊</b>
+   <span class="chip" style="border-color:${gc};color:${gc};font-size:10.5px;padding:2px 8px">${gt} · dist ${P.regime?P.regime.dist:"?"}</span>
+  </div>
+  ${P.picks.length?P.picks.map(p=>`
+  <div style="margin-top:8px;padding:8px 9px;border:1px solid #2a3448;border-radius:8px;${gate==="停手"?"opacity:.55":""}">
+   <div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px">
+    <span><b style="cursor:pointer;border-bottom:1px dotted #5c6577;font-size:14.5px" onclick="showT('${p.t}')">${p.t}</b> <small style="color:#8a93a6">${short(nm(p.t)||"",14)} · ${p.lay} · close $${p.c}</small></span>
+    <span style="font-size:11px;color:#aeb7c9;flex-shrink:0">${p.state} · R:R ${p.rr}</span>
+   </div>
+   <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px 10px;font-size:12.5px;margin-top:6px;line-height:1.45">
+    <span>Ⓐ 承接區 <b>$${p.zone[0]}–${p.zone[1]}</b><br><small style="color:#8a93a6">跌入區內＋當日收返區內先買</small></span>
+    <span>Ⓑ 突破位 <b>$${p.bo}</b><br><small style="color:#8a93a6">放量升穿先買</small></span>
+    <span>止蝕 <b class="neg">$${p.stop}</b></span>
+    <span>目標 <b class="pos">$${p.tgt}</b></span>
+   </div>
+   <div class="lab" style="margin-top:5px">${p.why}</div>
+  </div>`).join(""):`<div class="lab" style="margin-top:6px">今日冇合資格pick（regime或篩選唔過關）</div>`}
+  <div class="lab" style="margin-top:7px">Trigger-only：Ⓐ/Ⓑ都未發生＝坐低唔郁 · 跌穿止蝕＝計劃作廢 · 卡有效約5個交易日 · patterns, not investment advice</div>
+ </div>`;
+}
 function render(){
  const wd=new Date(D.date+"T12:00:00Z").toLocaleDateString("en-US",{weekday:"short"});
  document.getElementById("sub").textContent=`${D.date} (${wd}) · universe ${D.usize||249}`+(D.miss.length?` · ${D.miss.length} missing`:"");
@@ -141,6 +171,7 @@ function render(){
   `<span class="chip" style="cursor:pointer" onclick="showChar()">${charTxt()} <span style="color:#5c6577">ⓘ</span></span>`+
   `<span class="chip" style="cursor:pointer" onclick="showRegime()">${D.regime==="牛"?"Bull":"Bear"} · SPY vs 200DMA ${fp(D.spy.ma200,1)} <span style="color:#5c6577">ⓘ</span></span>`+
   (D.lead3.length?`<span class="chip">3-day leaders: ${D.lead3.map(g=>GN[g]||g).join(", ")}</span>`:"");
+ renderStrike();
  document.getElementById("kpi").innerHTML=[
   ["SPY",fp(D.spy.chg),cls(D.spy.chg),"showSPY"],["QQQ",fp(D.qqq),cls(D.qqq),"showQQQ"],
   ["Capex − Software",fp(D.bloc.cap-D.bloc.sw)+"pp",cls(D.bloc.cap-D.bloc.sw),"showCapSw"],
