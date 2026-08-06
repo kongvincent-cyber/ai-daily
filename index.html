@@ -145,24 +145,48 @@ function renderStrike(){
  el.innerHTML=`<div class="card" style="border-color:#5c4a1e;background:linear-gradient(180deg,#1c170e,#161b26);margin:10px 0">
   <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
    <b style="font-size:14px;color:#ffd479">⚔ Today's strike plan · 今日出擊</b>
-   <span class="chip" style="border-color:${gc};color:${gc};font-size:10.5px;padding:2px 8px">${gt} · dist ${P.regime?P.regime.dist:"?"}</span>
+   <span class="chip" style="border-color:${gc};color:${gc};font-size:10.5px;padding:2px 8px;cursor:pointer" onclick="showGate()">${gt} · 派貨${P.regime?P.regime.dist:"?"}${(P.regime&&P.regime.distf!=null)?`｜FTD後${P.regime.distf}`:""} <span style="color:#5c6577">ⓘ</span></span>
   </div>
-  ${P.picks.length?P.picks.map(p=>`
-  <div style="margin-top:8px;padding:8px 9px;border:1px solid #2a3448;border-radius:8px;${gate==="停手"?"opacity:.55":""}">
+  ${P.picks.length?P.picks.map(p=>strikeRow(p,gate,false)).join(""):`<div class="lab" style="margin-top:6px">今日冇合資格pick（regime或篩選唔過關）</div>`}
+  ${(P.alt&&P.alt.picks&&P.alt.picks.length)?`<div style="margin-top:9px;border-top:1px dashed #2a3448;padding-top:7px">
+   <div class="lab" style="margin-bottom:2px">⚖ ${P.alt.label||"對照組D · R:R優先（實驗中）"} — 紙上對賬，A/D擂台分開記分</div>
+   ${P.alt.picks.map(p=>strikeRow(p,gate,true)).join("")}</div>`:""}
+  <div class="lab" style="margin-top:7px">Trigger-only：Ⓐ/Ⓑ都未發生＝坐低唔郁 · 跌穿止蝕＝計劃作廢 · 卡有效約5個交易日 · A+D合計都只執行1-2注 · patterns, not investment advice</div>
+ </div>`;
+}
+function showGate(){
+ const P=D.picks; if(!P)return;
+ const R=P.regime||{}; const IX=R.idx||{};
+ const NM2={QQQ:"QQQ · 納指100",SPY:"SPY · 標普500",IWM:"IWM · 羅素2000",SMH:"SMH · 半導體",RSP:"RSP · 等權標普"};
+ const rows=Object.keys(NM2).map(k=>{
+  const o=IX[k];
+  if(!o||o.n==null)return `<div style="font-size:12.5px;margin:3px 0;color:#8a93a6">${NM2[k]}：數據未取</div>`;
+  const ds=o.days.length?o.days.map(x=>`${x.d.slice(0,5)}（${x.chg}%、量${x.v}M${x.pre?"、<span style='color:#8a93a6'>見底前遺產</span>":""}）`).join("、"):"無";
+  const nf=(o.nf!=null)?o.nf:"—";
+  return `<div style="font-size:12.5px;margin:4px 0"><b>${NM2[k]}</b>：正宗（FTD後）<b class="${nf>=3?"neg":(nf>=2?"":"pos")}" ${nf===2?'style="color:#ffd479"':''}>${nf}個</b> · 保守（8日窗）<b>${o.n}個</b><br><span class="lab">${ds}</span></div>`;
+ }).join("");
+ panel(`<b>倉位檔位${R.gate?` — ${R.gate}`:""}（distribution day派貨日）</b>
+  <div style="font-size:13px;margin:5px 0 2px">最近FTD（Follow-Through Day）：<b>${R.ftd||"—"}</b></div>
+  <div class="lab" style="margin:5px 0"><b>兩把尺</b>：①<b>正宗O'Neil</b>＝FTD翌日起錶重新計（新反彈嘅健康度）；②<b>保守</b>＝最近8個交易日滾動窗（包括見底前嘅派貨日，會隨時間自動碌出窗）。目前檔位由<b>保守尺（QQQ）</b>話事——寧緊勿鬆。</div>
+  <div class="lab" style="margin:5px 0"><b>派貨日定義</b>：當日收市跌≥0.2% 且 成交量高過前一日——價跌+量增＝機構出貨腳印；縮量下跌唔算（冇量＝大戶冇走）。</div>
+  <div style="font-size:13px;margin:5px 0">檔位：0-1＝正常 · <b style="color:#ffd479">2＝減注（注碼減半）</b> · <b class="neg">≥3＝停手（唔開新倉）</b></div>
+  ${rows}
+  <div class="lab" style="margin-top:7px">點解睇呢個：FTD後短期湧現2-3個派貨日，係新反彈夭折最可靠嘅前兆（O'Neil）。各指數各自計數，背離本身係情報：小型股派貨而大型股企穩＝市寬收窄。</div>`);
+}
+function strikeRow(p,gate,alt){
+ return `<div style="margin-top:8px;padding:8px 9px;border:1px ${alt?"dashed #3a4458":"solid #2a3448"};border-radius:8px;${gate==="停手"?"opacity:.55":""}${alt?"opacity:.85":""}">
    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px">
-    <span><b style="cursor:pointer;border-bottom:1px dotted #5c6577;font-size:14.5px" onclick="showT('${p.t}')">${p.t}</b> <small style="color:#8a93a6">${short(nm(p.t)||"",14)} · ${p.lay} · close $${p.c}</small></span>
+    <span><b style="cursor:pointer;border-bottom:1px dotted #5c6577;font-size:${alt?"13.5":"14.5"}px" onclick="showT('${p.t}')">${p.t}</b> <small style="color:#8a93a6">${short(nm(p.t)||"",14)} · ${p.lay} · close $${p.c}</small></span>
     <span style="font-size:11px;color:#aeb7c9;flex-shrink:0">${p.state} · R:R ${p.rr}</span>
    </div>
    <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px 10px;font-size:12.5px;margin-top:6px;line-height:1.45">
-    <span>Ⓐ 承接區 <b>$${p.zone[0]}–${p.zone[1]}</b><br><small style="color:#8a93a6">跌入區內＋當日收返區內先買</small></span>
+    <span>Ⓐ 承接區 <b>$${p.zone[0]}–${p.zone[1]}</b><br><small style="color:#8a93a6">回調入區、收市守住先買</small></span>
     <span>Ⓑ 突破位 <b>$${p.bo}</b><br><small style="color:#8a93a6">放量升穿先買</small></span>
     <span>止蝕 <b class="neg">$${p.stop}</b></span>
     <span>目標 <b class="pos">$${p.tgt}</b></span>
    </div>
    <div class="lab" style="margin-top:5px">${p.why}</div>
-  </div>`).join(""):`<div class="lab" style="margin-top:6px">今日冇合資格pick（regime或篩選唔過關）</div>`}
-  <div class="lab" style="margin-top:7px">Trigger-only：Ⓐ/Ⓑ都未發生＝坐低唔郁 · 跌穿止蝕＝計劃作廢 · 卡有效約5個交易日 · patterns, not investment advice</div>
- </div>`;
+  </div>`;
 }
 function render(){
  const wd=new Date(D.date+"T12:00:00Z").toLocaleDateString("en-US",{weekday:"short"});
