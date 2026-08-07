@@ -190,7 +190,7 @@ function strikeRow(p,gate,alt){
 }
 function render(){
  const wd=new Date(D.date+"T12:00:00Z").toLocaleDateString("en-US",{weekday:"short"});
- document.getElementById("sub").textContent=`${D.date} (${wd}) · universe ${D.usize||249}`+(D.miss.length?` · ${D.miss.length} missing`:"");
+ document.getElementById("sub").textContent=`${D.date} (${wd}) · universe ${D.usize||255}`+(D.miss.length?` · ${D.miss.length} missing`:"");
  document.getElementById("chips").innerHTML=
   `<span class="chip" style="cursor:pointer" onclick="showChar()">${charTxt()} <span style="color:#5c6577">ⓘ</span></span>`+
   `<span class="chip" style="cursor:pointer" onclick="showRegime()">${D.regime==="牛"?"Bull":"Bear"} · SPY vs 200DMA ${fp(D.spy.ma200,1)} <span style="color:#5c6577">ⓘ</span></span>`+
@@ -199,7 +199,7 @@ function render(){
  document.getElementById("kpi").innerHTML=[
   ["SPY",fp(D.spy.chg),cls(D.spy.chg),"showSPY"],["QQQ",fp(D.qqq),cls(D.qqq),"showQQQ"],
   ["Capex − Software",fp(D.bloc.cap-D.bloc.sw)+"pp",cls(D.bloc.cap-D.bloc.sw),"showCapSw"],
-  ["Advancers (of 249)",D.stats.up+"%",D.stats.up>=50?"pos":"neg","showAdv"],
+  ["Advancers (of "+(D.usize||255)+")",D.stats.up+"%",D.stats.up>=50?"pos":"neg","showAdv"],
   ["Gap win rate (>5% gap-ups)",D.gapmon.n?D.gapmon.win+"% ("+D.gapmon.n+" names)":"none",D.gapmon.n&&D.gapmon.win<30?"neg":"neu","showGap"],
   ["4% bursts (Pradeep)",(D.up4!==undefined?`${D.up4}↑ / ${D.dn4}↓`:"tap"),(D.up4!==undefined&&D.up4>=D.dn4)?"pos":"neg","showBurst"]
  ].map(([l,v,c,f])=>`<div class="card" style="cursor:pointer" onclick="${f}()"><div class="lab">${l} <span style="color:#5c6577">ⓘ</span></div><div class="val ${c}">${v}</div></div>`).join("");
@@ -446,7 +446,7 @@ function showChar(){
   ["Gap-down, recovered","median gap <−0.4% AND open→close >+0.2%",D.charc==="dip_recover"],
   ["Split / rotation","none of the above",D.charc==="split"]];
  panel(`<b>Market character — what it means</b>
-  <div class="lab" style="margin:6px 0 4px">Computed across all 249 universe names (NOT the index): take each stock's <b>open gap</b> (open vs prior close) and <b>open→close</b> move, then use the medians.</div>
+  <div class="lab" style="margin:6px 0 4px">Computed across all universe names (NOT the index): take each stock's <b>open gap</b> (open vs prior close) and <b>open→close</b> move, then use the medians.</div>
   <div style="font-size:13px;margin:6px 0">Today: median gap <b class="${cls(s.gap)}">${fp(s.gap)}</b> · median open→close <b class="${cls(s.o2c)}">${fp(s.o2c)}</b> · advancers <b>${s.up}%</b></div>
   <div class="lab">Rules (today's highlighted):</div>
   <div style="font-size:12px;line-height:1.7">${rows.map(([n,r,hit])=>`<div style="${hit?'color:#ffd479':''}">${hit?"▶":"·"} <b>${n}</b> — ${r}</div>`).join("")}</div>
@@ -469,7 +469,7 @@ async function showAdv(){
  let chart="";
  try{const S=await ensureSer();if(S.adv)chart=`<div class="lab" style="margin:8px 0 4px">Advancers % YTD:</div>${lineSvg(S.adv,536,120,"#9a86ff")}`;}catch(e){}
  panel(`<b>Advancers — participation breadth</b>
-  <div class="lab" style="margin-top:6px">Share of the 249 universe names that closed up on the day. ≥70% = broad advance; ≤30% = broad decline; the zone between is where rotation and index-vs-army splits live. Divergence to watch: index up while advancers <50% = narrow leadership.</div>
+  <div class="lab" style="margin-top:6px">Share of the universe names that closed up on the day. ≥70% = broad advance; ≤30% = broad decline; the zone between is where rotation and index-vs-army splits live. Divergence to watch: index up while advancers <50% = narrow leadership.</div>
   <div style="font-size:13px;margin:6px 0">Today: <b>${D.stats.up}%</b></div>${chart}`);
 }
 document.getElementById("pw").addEventListener("keydown",e=>{if(e.key==="Enter")unlock()});
