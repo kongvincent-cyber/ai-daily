@@ -235,12 +235,14 @@ function renderRows(){
   const open=openG===g.g;
   const mem=(D.members&&D.members[g.g]||[]).map(m=>
    `<span class="mchip" onclick="event.stopPropagation();showT('${m.t}')">${m.t} <b class="${cls(m.c)}">${fp(m.c,1)}</b>${m.e?`<span class="e" onclick="event.stopPropagation();showEPS('${m.t}')">E</span>`:''}<small>${short(nm(m.t),16)}</small></span>`).join("");
-  return `<div class="grow" onclick="tgG('${g.g}')"><div class="row"><span class="caret">${open?"▼":"▶"}</span><div class="gname">${GN[g.g]||g.name}</div>${spark(D.ghist[g.g])}
+  return `<div class="grow" data-g="${g.g}" onclick="tgG('${g.g}')"><div class="row"><span class="caret">${open?"▼":"▶"}</span><div class="gname">${GN[g.g]||g.name}</div>${spark(D.ghist[g.g])}
    <div class="gmed ${cls(g.med)}">${fp(g.med)}</div>
    <div class="gsub">adv ${g.up}% · pos ${g.rp.toFixed(2)}<br>σ ${g.sig.toFixed(1)}${w}</div></div>
    <div class="mem${open?" open":""}">${mem}</div></div>`;
  }).join("");
  document.getElementById("sbtn").textContent=mode==="med"?"Sort: median %":"Sort: σ dispersion";
+ try{window.LBGlue&&LBGlue.afterGroupTable();}catch(e){console.warn(e)}
+ try{window.LBGlue&&LBGlue.afterLevelDetail();}catch(e){console.warn(e)}
 }
 async function tgTag(i){const e=document.getElementById("tagx"+i);const open=e.style.display==="none";e.style.display=open?"block":"none";
  if(open&&!e.dataset.c){e.dataset.c="1";
@@ -474,4 +476,6 @@ async function showAdv(){
 }
 document.getElementById("pw").addEventListener("keydown",e=>{if(e.key==="Enter")unlock()});
 tryCache();
-</script></body></html>
+</script>
+<script defer src="layer_bars_tab.js"></script>
+<script defer src="layer_bars_glue.js"></script></body></html>
