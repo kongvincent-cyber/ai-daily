@@ -4,7 +4,8 @@
  *   LayerBars.regimeChip(layerBarsJson, "L5")  → HTML string(▲多頭 / ▼空頭 / ●糾纏 + 連21E),放入 group strength 主表每行
  *   LayerBars.destroy(containerEl)
  * 數據:layer_bars_build.py 輸出(dates + layers[L].{o,h,l,c,e9,e21,s50,s200,adv,stats,label,n})。
- * 主線 21EMA(墨色粗)+ 9EMA;次線 50SMA(灰實)+ 200SMA(灰虛);底欄 adv%(闊度,取代成交量),<20% 標紅。
+ * 主線 21EMA(墨色粗)+ 9EMA;次線 50SMA(灰實)+ 200SMA(灰虛);底欄:柱=1日 adv%(<20% 標紅),線=企21E%(結構闊度;v2 2026-09-03,接棒門檻 ≥60)。
+ * v2.1 2026-09-04:接棒兩旗——「接棒✓ 重奪日」(事件:今日重奪 21E)/「接棒中」(狀態:企 21E 上);兩者都要 收位≥0.6 兼 企21E%≥60(R-001 裁決 C)。
  * 誠實聲明固定印喺圖底:C=真・O≈真・H/L 膨脹(收位只作日比,ATR 禁)。
  * 主題:CSS 變數 --lb-* 可由 app 覆寫(預設係 dataviz 驗證過嘅深色調色板)。
  */
@@ -62,12 +63,13 @@
       <span class="num">連21EMA ${s.streak > 0 ? '+' : ''}${s.streak}日</span>
       <span class="num">距21E ${pn(s.dist['21E'])}</span><span class="num">距50S ${pn(s.dist['50S'])}</span>
       <span class="num">指數日 ${pn(s.day)}</span>${opts.median != null ? `<span class="num">median ${pn(opts.median)}</span>` : ''}
-      <span class="num">闊度 ${s.adv_today == null ? '—' : s.adv_today + '%'}${s.adv_lt20_streak >= 2 ? ' <b class="lb-neg">連' + s.adv_lt20_streak + '日<20%</b>' : ''}</span>`;
+      <span class="num">闊度 ${s.adv_today == null ? '—' : s.adv_today + '%'}${s.adv_lt20_streak >= 2 ? ' <b class="lb-neg">連' + s.adv_lt20_streak + '日<20%</b>' : ''}</span>
+      <span class="num" title="成員收企自家21EMA上 %;接棒門檻 ≥60">企21E% ${s.b21_today == null ? '—' : (s.b21_today >= 60 ? '<b class="lb-pos">' + s.b21_today + '%</b>' : s.b21_today + '%')}</span>${s.handoff && s.handoff.ok_reclaim ? '<span class="lb-chip bull" title="今日收市重奪21E・收位≥0.6・企21E%≥60(事件旗 R-001)">接棒✓ 重奪日</span>' : (s.handoff && (s.handoff.ok_state || s.handoff.ok) ? '<span class="lb-chip bull" title="企21E上・收位≥0.6・企21E%≥60(狀態旗 R-001)">接棒中</span>' : '')}`;
     container.appendChild(head);
     const bar = document.createElement('div'); bar.className = 'lb-bar';
     bar.innerHTML = `<div class="lb-seg"><button data-n="63">3M</button><button data-n="126">6M</button><button data-n="251">12M</button></div>
       <span class="lb-legend"><span><i style="border-color:var(--lb-e21)"></i>21E</span><span><i style="border-color:var(--lb-e9)"></i>9E</span>
-      <span><i class="thin" style="border-color:var(--lb-sma)"></i>50S</span><span><i class="thin dash" style="border-color:var(--lb-sma)"></i>200S</span><span>底欄=闊度 adv%</span></span>`;
+      <span><i class="thin" style="border-color:var(--lb-sma)"></i>50S</span><span><i class="thin dash" style="border-color:var(--lb-sma)"></i>200S</span><span>底欄:柱=1日adv%・<i style="border-color:var(--lb-e21)"></i>企21E%(≥60 接棒)</span></span>`;
     container.appendChild(bar);
     const scroll = document.createElement('div'); scroll.className = 'lb-scroll'; container.appendChild(scroll);
     const foot = document.createElement('div'); foot.className = 'lb-foot';
@@ -80,7 +82,7 @@
       scroll.innerHTML = '';
       const st = NALL - NSHOW, dates = ALL.slice(st), N = dates.length;
       const sl = a => a.slice(st);
-      const d = { o: sl(D.o), h: sl(D.h), l: sl(D.l), c: sl(D.c), e9: sl(D.e9), e21: sl(D.e21), s50: sl(D.s50), s200: sl(D.s200), adv: sl(D.adv) };
+      const d = { o: sl(D.o), h: sl(D.h), l: sl(D.l), c: sl(D.c), e9: sl(D.e9), e21: sl(D.e21), s50: sl(D.s50), s200: sl(D.s200), adv: sl(D.adv), b21: sl(D.b21 || []) };
       const narrow = container.clientWidth < 600;
       const PADL = 6, PADR = narrow ? 62 : 78, PADT = 6, PH = narrow ? 140 : 180, GAP = 8, BH = narrow ? 30 : 40, PADB = 20;
       const avail = Math.max(240, container.clientWidth - 24 - PADL - PADR);
@@ -121,12 +123,19 @@
       // breadth pane
       el('line', { x1: PADL, x2: XR, y1: BY(50), y2: BY(50), stroke: 'var(--lb-grid)', 'stroke-width': 1, 'stroke-dasharray': '2 2' }, svg);
       el('line', { x1: PADL, x2: XR, y1: BY(20), y2: BY(20), stroke: 'var(--lb-axis)', 'stroke-width': 1 }, svg);
-      el('text', { x: XR + 4, y: BY(50) + 3, 'font-size': 9, fill: 'var(--lb-muted)' }, svg).textContent = 'adv 50%';
+      el('line', { x1: PADL, x2: XR, y1: BY(60), y2: BY(60), stroke: 'var(--lb-e21)', 'stroke-width': 1, 'stroke-dasharray': '3 3', opacity: .6 }, svg);
+      el('text', { x: XR + 4, y: BY(60) + 3, 'font-size': 9, fill: 'var(--lb-e21)' }, svg).textContent = '60%';
       el('text', { x: XR + 4, y: BY(20) + 3, 'font-size': 9, fill: 'var(--lb-muted)' }, svg).textContent = '20%';
       for (let i = 0; i < N; i++) {
         const v = d.adv[i]; if (v == null) continue;
         const weak = v < 20 && i > 0 && d.adv[i - 1] != null && d.adv[i - 1] < 20;   // 連續兩日 <20% = 派發訊號
         el('rect', { x: X(i) - BW / 2, y: BY(v), width: BW, height: Math.max(1, BY0 + BH - BY(v)), fill: weak ? 'var(--lb-warn)' : (v < 20 ? 'var(--lb-down)' : 'var(--lb-muted)'), opacity: weak ? 1 : .75 }, svg);
+      }
+      // 企21E% 線(結構闊度;null 斷開)
+      if (d.b21.some(v => v != null)) {
+        let p = '', pen = false;
+        for (let i = 0; i < N; i++) { const v = d.b21[i]; if (v == null) { pen = false; continue; } p += (pen ? 'L' : 'M') + X(i).toFixed(1) + ' ' + BY(v).toFixed(1); pen = true; }
+        el('path', { d: p, fill: 'none', stroke: 'var(--lb-e21)', 'stroke-width': 1.6, 'stroke-linejoin': 'round' }, svg);
       }
       // hover / touch
       const cross = el('line', { x1: -9, x2: -9, y1: PADT, y2: BY0 + BH, stroke: 'var(--lb-axis)', 'stroke-width': 1, 'stroke-dasharray': '2 3' }, svg);
@@ -136,7 +145,7 @@
         cross.setAttribute('x1', X(i)); cross.setAttribute('x2', X(i));
         const gap = i ? (d.o[i] / d.c[i - 1] - 1) * 100 : 0, oc = (d.c[i] / d.o[i] - 1) * 100, day = i ? (d.c[i] / d.c[i - 1] - 1) * 100 : 0;
         const rp = d.h[i] - d.l[i] > 0 ? (d.c[i] - d.l[i]) / (d.h[i] - d.l[i]) : .5;
-        tip.innerHTML = `<b>${L} ${dates[i]}</b><br>O ${fmt(d.o[i])} H ${fmt(d.h[i])} L ${fmt(d.l[i])} C <b>${fmt(d.c[i])}</b><br>日 <b>${sgn(day)}</b> 裂口 ${sgn(gap)} 開→收 ${sgn(oc)} 收位 ${fmt(rp, 2)} 闊度 ${d.adv[i] == null ? '—' : d.adv[i] + '%'}<br>9E ${fmt(d.e9[i])} · 21E ${fmt(d.e21[i])} · 50S ${fmt(d.s50[i])} · 200S ${fmt(d.s200[i])}`;
+        tip.innerHTML = `<b>${L} ${dates[i]}</b><br>O ${fmt(d.o[i])} H ${fmt(d.h[i])} L ${fmt(d.l[i])} C <b>${fmt(d.c[i])}</b><br>日 <b>${sgn(day)}</b> 裂口 ${sgn(gap)} 開→收 ${sgn(oc)} 收位 ${fmt(rp, 2)} 闊度 ${d.adv[i] == null ? '—' : d.adv[i] + '%'} 企21E ${d.b21[i] == null ? '—' : d.b21[i] + '%'}<br>9E ${fmt(d.e9[i])} · 21E ${fmt(d.e21[i])} · 50S ${fmt(d.s50[i])} · 200S ${fmt(d.s200[i])}`;
         tip.style.display = 'block'; const tw = tip.offsetWidth, th = tip.offsetHeight; let tx = cx + 14, ty = cy - th - 10;
         if (tx + tw > innerWidth - 8) tx = Math.max(4, cx - tw - 14); if (ty < 8) ty = cy + 16; tip.style.left = tx + 'px'; tip.style.top = ty + 'px';
       };
