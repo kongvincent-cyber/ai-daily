@@ -1,4 +1,4 @@
-/* layer_bars_glue.js — 將 layer_bars_tab.js 接駁落現有 app（2026-09-01 批次）。
+/* layer_bars_glue.js — 將 layer_bars_tab.js 接駁落現有 app（2026-09-01 批次；v1.1 2026-09-08 修 6M/12M 冒泡收起）。
  * 硬規則：additive。現有成員表／選股／裁決邏輯一律唔動；全部包 try/catch，
  * 任何 exception 只 console.warn；window.LB_ENABLED=false 即整個關掉，頁面同改動前一模一樣。
  * 掛接點：renderRows() 完成之後 call LBGlue.afterGroupTable() 同 LBGlue.afterLevelDetail()。
@@ -51,6 +51,7 @@
       var tabs = document.createElement('div'); tabs.className = 'lb-tabs';
       tabs.innerHTML = '<button data-t="mem" class="on">成員</button><button data-t="idx">指數</button>';
       var idx = document.createElement('div'); idx.style.display = 'none';
+      idx.addEventListener('click', function (ev) { ev.stopPropagation(); });   // v1.1 2026-09-08：指數 tab 內任何 click（3M/6M/12M、圖面 tooltip）唔可以冒泡到 .grow onclick=tgG()，否則整行收起、component 被 renderRows() 銷毀
       mem.appendChild(tabs); mem.appendChild(memWrap); mem.appendChild(idx);
       tabs.addEventListener('click', function (ev) {
         ev.stopPropagation();
