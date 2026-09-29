@@ -56,6 +56,7 @@ button{background:#1b2230;color:#aeb7c9;border:1px solid #2a3448;border-radius:8
 <input id="pw" type="password" placeholder="Enter passcode" autocomplete="current-password">
 <button onclick="unlock()">Unlock</button><div id="lockmsg"></div></div>
 <div id="app" style="display:none">
+<div id="auto-update-status" class="lab" role="status" style="margin-bottom:6px"></div>
 <h1><span>AI 6-Layer Daily</span><span style="display:flex;gap:6px;align-items:center"><span class="lab">History</span><select id="dsel" onchange="loadDay(this.value)"></select></span></h1>
 <div class="sub" id="sub"></div>
 <input id="q" type="search" placeholder="🔍 Search ticker or name (e.g. SNDK / Palantir)" style="width:100%;margin:4px 0" oninput="srch(this.value)">
@@ -88,7 +89,7 @@ async function deriveKey(pw){
 async function dec(buf){const b=new Uint8Array(buf);
  const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:b.slice(0,12)},KEY,b.slice(12));
  return JSON.parse(new TextDecoder().decode(pt));}
-async function fetchEnc(p){const r=await fetch(p+"?t="+Date.now());if(!r.ok)throw new Error(p);return dec(await r.arrayBuffer());}
+async function fetchEnc(p){const r=await fetch(p+"?t="+Date.now(),{cache:"no-store"});if(!r.ok)throw new Error(p);return dec(await r.arrayBuffer());}
 async function unlock(){
  const pw=document.getElementById("pw").value.trim().toUpperCase();
  document.getElementById("lockmsg").textContent="";
@@ -104,13 +105,25 @@ async function boot(){
  D=await fetchEnc("latest.enc");
  document.getElementById("lock").style.display="none";
  document.getElementById("app").style.display="block";
- render();
+ SER=null;LASTC=null;openG=null;render();
+ if(window.AIAutomationStatus)window.AIAutomationStatus();
  try{MAN=await (await fetch("manifest.json?t="+Date.now())).json();
   const s=document.getElementById("dsel");
   s.innerHTML=MAN.dates.slice().reverse().map(d=>`<option value="${d}">${d.slice(4,6)}/${d.slice(6,8)}</option>`).join("");
  }catch(e){}
  try{HIST=await fetchEnc("history.enc");renderHist();}catch(e){}
 }
+async function refreshLatest(){
+ if(!KEY)return;
+ try{const r=await fetch("manifest.json?t="+Date.now(),{cache:"no-store"});if(!r.ok)return;const m=await r.json();
+ if(m.updated&&m.updated!==MAN?.updated){await boot();}
+ }catch(e){/* Preserve the last displayed data and saved key on network failure. */}
+}
+let lastForegroundCheck=0;
+function checkOnReturn(){if(document.visibilityState!=="visible"||Date.now()-lastForegroundCheck<30000)return;lastForegroundCheck=Date.now();refreshLatest();}
+document.addEventListener("visibilitychange",checkOnReturn);
+window.addEventListener("pageshow",checkOnReturn);
+window.addEventListener("online",checkOnReturn);
 async function loadDay(d){try{D=await fetchEnc("data/"+d+".enc");openG=null;render();}catch(e){}}
 function spark(seq,w=120,h=26){
  if(!seq||seq.length<2)return"";
@@ -478,5 +491,6 @@ document.getElementById("pw").addEventListener("keydown",e=>{if(e.key==="Enter")
 tryCache();
 </script>
 <script defer src="mobile_update.js?v=20260929-2"></script>
+<script defer src="automation_setup.js?v=20260929-1"></script>
 <script defer src="layer_bars_tab.js"></script>
 <script defer src="layer_bars_glue.js"></script></body></html>
