@@ -99,7 +99,7 @@ async function unlock(){
 }
 async function tryCache(){const k=localStorage.getItem("k");if(!k)return;
  try{KEY=await crypto.subtle.importKey("raw",Uint8Array.from(atob(k),c=>c.charCodeAt(0)),{name:"AES-GCM"},true,["decrypt"]);await boot();}
- catch(e){KEY=null;localStorage.removeItem("k");}}
+ catch(e){KEY=null;document.getElementById("lockmsg").textContent="Saved unlock temporarily unavailable. Please retry when connected.";}}
 async function boot(){
  D=await fetchEnc("latest.enc");
  document.getElementById("lock").style.display="none";
@@ -477,5 +477,6 @@ async function showAdv(){
 document.getElementById("pw").addEventListener("keydown",e=>{if(e.key==="Enter")unlock()});
 tryCache();
 </script>
+<script defer src="mobile_update.js"></script>
 <script defer src="layer_bars_tab.js"></script>
 <script defer src="layer_bars_glue.js"></script></body></html>
