@@ -31,8 +31,13 @@
     assert(n>0&&!s.dates.includes(day),'趨勢資料已包含本次日期。');
     for(const k of ['capsw','adv','up4','dn4','gapn','gapwin','gapmed','spy','qqq'])
       assert(Array.isArray(s[k])&&s[k].length===n&&p.series_record[k]!==undefined,'趨勢資料不完整。');
-    for(const type of ['spy_ma','qqq_ma'])for(const k of ['m20','m50','m200'])
-      assert(Array.isArray(s[type][k])&&s[type][k].length===n&&p.series_record[type][k]!==undefined,'均線資料不完整。');
+    // The original publisher appends MA values without requiring the legacy
+    // arrays to have the date array's length. Preserve those arrays verbatim;
+    // rejecting unequal lengths prevents valid existing Apps from updating.
+    for(const type of ['spy_ma','qqq_ma'])for(const k of ['m20','m50','m200']){
+      assert(Array.isArray(s[type]?.[k]),'原有均線格式無效：'+type+'/'+k+'。');
+      assert(p.series_record[type]?.[k]!==undefined,'更新檔缺少均線：'+type+'/'+k+'。');
+    }
     return members;
   }
   async function createFiles(p,b,readKey,c,progress=()=>{}){
@@ -98,13 +103,14 @@
   function install(){
     const host=document.getElementById('app');if(!host)return;
     const box=document.createElement('details');box.className='card';box.id='mobile-update';
-    box.innerHTML='<summary>更新資料</summary><p class="lab">選取今次提供嘅更新檔，再將產生嘅加密 ZIP 交返 ChatGPT 完成發布。解鎖金鑰會留喺本機。</p><input type="file" accept=".json,application/json" aria-label="選擇更新檔"><p class="lab" role="status">尚未選擇更新檔。</p><a hidden download>下載加密 ZIP</a>';
+    box.innerHTML='<summary>更新資料</summary><p class="lab">選取今次提供嘅更新檔，再將產生嘅加密 ZIP 交返 ChatGPT 完成發布。解鎖金鑰會留喺本機。</p><input type="file" accept=".json,application/json" aria-label="選擇更新檔"><p class="lab" data-selected>尚未選擇更新檔。</p><p class="lab" role="status"></p><button type="button" hidden>重新處理已選檔</button><a hidden download>下載加密 ZIP</a><p class="lab">更新工具 v1.1</p>';
     host.appendChild(box);
-    const input=box.querySelector('input'),status=box.querySelector('[role="status"]'),link=box.querySelector('a');let url=null;
-    input.addEventListener('change',async()=>{
+    const input=box.querySelector('input'),selected=box.querySelector('[data-selected]'),status=box.querySelector('[role="status"]'),retry=box.querySelector('button'),link=box.querySelector('a');let url=null;
+    const processFile=async()=>{
       if(url){URL.revokeObjectURL(url);url=null;}link.hidden=true;
       const file=input.files[0];if(!file)return;
-      input.disabled=true;
+      selected.textContent='已選擇：'+file.name;
+      input.disabled=true;retry.hidden=true;
       try{
         assert(typeof KEY!=='undefined'&&KEY,'請用已經自動解鎖嘅手機 App。');
         assert(file.size<25*1024*1024,'更新檔太大。');status.textContent='檢查更新檔…';
@@ -119,9 +125,11 @@
         url=URL.createObjectURL(new Blob([zip(files)],{type:'application/zip'}));
         link.href=url;link.download='ai-daily-'+p.date.replaceAll('-','')+'-encrypted.zip';link.textContent='下載 '+p.date+' 加密 ZIP';link.hidden=false;
         status.textContent='260 個檔案已驗證。下載 ZIP 後傳返呢段 ChatGPT 對話，先會正式發布。';
-      }catch(error){status.textContent=error instanceof SyntaxError?'呢個檔案格式唔正確。':error.message;}
-      finally{input.disabled=false;input.value='';}
-    });
+      }catch(error){status.textContent=error instanceof SyntaxError?'呢個檔案格式唔正確。':error.message;retry.hidden=false;}
+      finally{input.disabled=false;}
+    };
+    input.addEventListener('change',processFile);
+    retry.addEventListener('click',processFile);
   }
   return {validate,createFiles,zip,install};
 });
