@@ -15,7 +15,9 @@
     <p><a href="https://github.com/kongvincent-cyber/ai-daily-system/settings/secrets/actions/new" target="_blank" rel="noopener noreferrer">開啟私人 GitHub 設定</a>：Name 填 <code>APP_KEY_B64</code>，Secret 貼上，按 Add secret。</p>
     <p>此金鑰等同解鎖權限；只貼入上述私人項目的 Secret，唔好傳入對話或公開檔案。</p>
     <p>另需一次性設定發布權限 <code>APP_PUBLISH_TOKEN</code>。兩項完成後，從 GitHub Actions 驗證並啟用；未驗證前唔代表自動更新已生效。</p>`;
-  app.appendChild(panel);
+  const subtitle=document.getElementById('sub');
+  if(subtitle)subtitle.insertAdjacentElement('afterend',panel);
+  else app.appendChild(panel);
   document.getElementById('automatic-copy').addEventListener('click',()=>{
     const msg=document.getElementById('automatic-copy-status');
     if(!document.getElementById('automatic-consent').checked){msg.textContent='請先確認上面的一次性授權。';return;}
