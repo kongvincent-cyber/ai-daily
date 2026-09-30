@@ -529,7 +529,7 @@ tryCache();
   if(!KEY||!D||busy)return;busy=true;init();
   try{
    const r=await fetch('reports/manifest.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('未發布');manifest=await r.json();
-   manifest.reports.sort((a,b)=>b.generated_at.localeCompare(a.generated_at));
+   manifest.reports.sort((a,b)=>b.date.localeCompare(a.date)||(a.kind===b.kind?b.generated_at.localeCompare(a.generated_at):(a.kind==='postmarket'?-1:1)));
    const select=document.getElementById('reports-select');const previous=select.value;select.replaceChildren();
    for(const x of manifest.reports){const opt=text('option',`${x.date} ${x.kind==='premarket'?'盤前':'收市'}`);opt.value=x.path;select.append(opt);}
    const entry=manifest.reports[0];if(entry&&(force||loaded!==entry.path))await show(entry);else if(previous)select.value=previous;
