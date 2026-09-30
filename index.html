@@ -107,6 +107,7 @@ async function boot(){
  document.getElementById("app").style.display="block";
  SER=null;LASTC=null;openG=null;render();
  if(window.AIAutomationStatus)window.AIAutomationStatus();
+ if(window.AIReportsRefresh)window.AIReportsRefresh();
  try{MAN=await (await fetch("manifest.json?t="+Date.now())).json();
   const s=document.getElementById("dsel");
   s.innerHTML=MAN.dates.slice().reverse().map(d=>`<option value="${d}">${d.slice(4,6)}/${d.slice(6,8)}</option>`).join("");
@@ -493,4 +494,53 @@ tryCache();
 <script defer src="mobile_update.js?v=20260929-2"></script>
 <script defer src="automation_setup.js?v=20260929-2"></script>
 <script defer src="layer_bars_tab.js"></script>
-<script defer src="layer_bars_glue.js"></script></body></html>
+<script defer src="layer_bars_glue.js"></script><script>
+// Report packets use the App's existing AES-GCM key; no extra login or key copy.
+(()=>{
+ let box,manifest,loaded,urls=[],busy=false;
+ function text(tag,value){const e=document.createElement(tag);e.textContent=value;return e;}
+ function revoke(){for(const u of urls)URL.revokeObjectURL(u);urls=[];}
+ function file(b64,type){const b=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));const u=URL.createObjectURL(new Blob([b],{type}));urls.push(u);return u;}
+ function init(){
+  if(box)return;
+  box=document.createElement('section');box.className='card';box.id='daily-reports';box.style.margin='12px 0';
+  box.innerHTML='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><strong>每日報告 · 廣東話音頻</strong><button id="reports-refresh" type="button">重新檢查</button></div><div id="reports-status" class="lab" role="status" style="margin:8px 0"></div><select id="reports-select" aria-label="選擇報告" style="max-width:100%;margin-bottom:8px"></select><div id="reports-content"></div>';
+  document.getElementById('sub').after(box);
+  document.getElementById('reports-refresh').onclick=()=>refresh(true);
+  document.getElementById('reports-select').onchange=()=>show(manifest.reports.find(x=>x.path===document.getElementById('reports-select').value));
+ }
+ async function show(entry){
+  if(!entry)return;const status=document.getElementById('reports-status');status.textContent='載入加密報告…';
+  try{
+   const p=await fetchEnc(entry.path);if(p.date!==entry.date||p.kind!==entry.kind)throw Error('日期不符');
+   revoke();const content=document.getElementById('reports-content');content.replaceChildren();loaded=entry.path;
+   status.textContent=`${p.date} ${p.kind==='premarket'?'盤前':'收市'} · ${new Date(p.generated_at).toLocaleString('zh-HK',{timeZone:'Asia/Hong_Kong'})} 香港時間`;
+   const pdf=text('a','開啟／下載 PDF');pdf.href=file(p.pdf_b64,'application/pdf');pdf.target='_blank';pdf.rel='noopener';pdf.download=`AI-${p.kind}-${p.date}.pdf`;pdf.style.cssText='display:inline-block;color:#ffd479;padding:8px 0;margin-right:18px';content.append(pdf);
+   const toggle=text('button','閱讀全文');toggle.type='button';content.append(toggle);
+   if(p.audio_b64){const a=document.createElement('audio');a.controls=true;a.preload='metadata';a.src=file(p.audio_b64,'audio/mpeg');a.style.cssText='display:block;width:100%;margin:12px 0';content.append(a);}
+   else content.append(text('p','音頻尚未發布。'));
+   if(p.research_status!=='complete')content.append(text('p','部分財報研究待補；已核實內容及資料限制已列於報告。'));
+   const frame=document.createElement('iframe');frame.title='完整每日報告';frame.sandbox='';frame.srcdoc=p.html;frame.hidden=true;frame.style.cssText='width:100%;height:75vh;border:0;background:white;border-radius:8px;margin-top:10px';content.append(frame);
+   toggle.onclick=()=>{frame.hidden=!frame.hidden;toggle.textContent=frame.hidden?'閱讀全文':'收起全文';};
+   if(p.watchpoint_date===D?.earn?.nx&&p.watchpoints){D.wp=p.watchpoints;const earn=document.getElementById('earn');if(typeof render==='function'){render();}}
+  }catch(e){status.textContent='報告暫時載入唔到，請按「重新檢查」。';}
+ }
+ async function refresh(force=false){
+  if(!KEY||!D||busy)return;busy=true;init();
+  try{
+   const r=await fetch('reports/manifest.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('未發布');manifest=await r.json();
+   manifest.reports.sort((a,b)=>b.generated_at.localeCompare(a.generated_at));
+   const select=document.getElementById('reports-select');const previous=select.value;select.replaceChildren();
+   for(const x of manifest.reports){const opt=text('option',`${x.date} ${x.kind==='premarket'?'盤前':'收市'}`);opt.value=x.path;select.append(opt);}
+   const entry=manifest.reports[0];if(entry&&(force||loaded!==entry.path))await show(entry);else if(previous)select.value=previous;
+  }catch(e){document.getElementById('reports-status').textContent='報告尚未發布；股價及圖表照常更新。';}
+  finally{busy=false;}
+ }
+ window.AIReportsRefresh=refresh;
+ window.addEventListener('pageshow',()=>refresh());window.addEventListener('online',()=>refresh());
+ document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refresh();});
+ refresh();
+})();
+
+</script>
+</body></html>
