@@ -36,6 +36,8 @@
     const top=document.getElementById('auto-update-status');
     if(typeof D==='undefined'||!D)return;
     if(D.automation){
+      panel.hidden=true;
+      panel.open=false;
       state.textContent='伺服器自動更新資料日期：'+D.date+'。日常使用毋須再做此設定。';
       if(top)top.textContent='自動更新 · '+D.date+(D.automation.research_missing?.length?' · 部分財報關注點待研究':'');
     }else if(top){top.textContent='資料日期 '+D.date+' · 每日自動發布尚待一次性設定';}
