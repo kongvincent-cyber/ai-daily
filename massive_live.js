@@ -141,7 +141,7 @@
             updateQuotes();message('已連線 · 等候行情');
             stableTimer=setTimeout(()=>{if(state.ws===ws)state.failures=0;},60000);
           }
-        }else if(state.authenticated&&state.book.event(x,Date.now()))state.lastReceivedAt=Date.now();
+        }else if(state.authenticated&&state.book.event(x,Date.now())){state.lastReceivedAt=Date.now();state.phase='已連線 · 串流收到';}
       }
     };
     ws.onerror=()=>{state.detail='網絡連線中斷';};
@@ -177,7 +177,8 @@
     const marketFresh=market&&Math.abs(now-Date.parse(market.serverTime))<180000;
     const active=marketFresh&&(market.market==='open'||market.earlyHours||market.afterHours);
     const session=marketFresh?(market.earlyHours?'盤前':market.afterHours?'盤後':market.market==='open'?'正常交易時段':'休市'):'市場狀態未核實';
-    statusEl.textContent=`${session} · ${state.phase}${state.detail?' · '+state.detail:''}`;
+    const status=`${session} · ${state.phase}${state.detail?' · '+state.detail:''}`;
+    if(statusEl.textContent!==status)statusEl.textContent=status;
     const rows=[...state.book.rows.values()],fresh=rows.filter(r=>r.priceAt&&now-r.priceAt<120000&&C.day(r.priceAt)===C.day(now)).length;
     feedEl.textContent=`${rows.filter(r=>r.price).length}/${state.book.symbols.size} 價格 · ${active?fresh+' 個近兩分鐘有成交':'顯示最後可用行情'} · 每秒刷新畫面`;
     const historical=typeof D!=='undefined'&&D&&D.date!==state.latest.date;
