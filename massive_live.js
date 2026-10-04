@@ -210,7 +210,7 @@
     if(cardEl.querySelector('[data-price-details]').open) {
       tableEl.replaceChildren();const search=cardEl.querySelector('[data-live-search]').value.trim().toUpperCase();
       for(const t of symbols().filter(t=>!search||t.includes(search)||(state.latest.names?.[t]||'').toUpperCase().includes(search)).sort()) {
-        const r=state.book.rows.get(t),row=node('div',null,'massive-price-row');
+        const r=state.book.rows.get(t),row=node('div',null,'massive-price-row');row.dataset.ticker=t;
         const title=node('button',t);title.type='button';title.addEventListener('click',()=>{if(typeof showT==='function'&&state.latest.members&&Object.values(state.latest.members).flat().some(m=>m.t===t))showT(t);});
         row.append(title,node('span',priceLine(t,now)));
         if(r?.bid&&r?.ask)row.append(node('small',`買 ${money(r.bid)} / 賣 ${money(r.ask)} · ${clock(r.quoteAt)}${now-r.quoteAt>120000?' · 最後買賣盤':''}`));

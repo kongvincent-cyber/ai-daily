@@ -28,12 +28,17 @@
       if (r.priceAt != null && ts < r.priceAt) return false;
       Object.assign(r,{price:Number(p),priceAt:ts,source}); return true;
     }
-    quote(t,bid,ask,ts,now) {
+    quote(t,bid,ask,ts,now,sequence) {
       ts = timestamp(ts,now);
       if (!this.symbols.has(t) || !pos(bid) || !pos(ask) || Number(ask)<Number(bid) || ts === null) return false;
       const r = this.row(t);
       if (r.quoteAt != null && ts < r.quoteAt) return false;
-      Object.assign(r,{bid:Number(bid),ask:Number(ask),quoteAt:ts}); return true;
+      const ordered=Number.isSafeInteger(sequence)&&sequence>=0;
+      if (r.quoteAt != null && day(ts)===day(r.quoteAt)) {
+        if(ordered&&r.quoteSequence!=null&&sequence<r.quoteSequence)return false;
+        if(!ordered&&ts===r.quoteAt&&r.quoteSequence!=null)return false;
+      }
+      Object.assign(r,{bid:Number(bid),ask:Number(ask),quoteAt:ts,quoteSequence:ordered?sequence:null}); return true;
     }
     snapshot(rows,now) {
       for (const x of rows) {
@@ -47,7 +52,7 @@
     }
     event(x,now) {
       if (x.ev === 'A') return this.price(x.sym,x.c,x.e,now,'秒級成交');
-      if (x.ev === 'Q') return this.quote(x.sym,x.bp,x.ap,x.t,now);
+      if (x.ev === 'Q') return this.quote(x.sym,x.bp,x.ap,x.t,now,x.q);
       return false;
     }
   }
@@ -84,7 +89,7 @@
       return {ready:false,covered,total:spec.members.length,reason:'成員或前收基準未齊'};
     const change=100*sum/covered,index=spec.close*(1+change/100);
     // One provisional daily observation, never EMA per tick.
-    const ema21=baseline.asof<today ? spec.ema21+(index-spec.ema21)/11 : spec.ema21;
+    const ema21=baseline.asof<today ? spec.ema21+(index-spec.ema21)/11 : spec.ema21+(index-spec.close)/11;
     return {ready:true,index,change,ema21,above21:index/ema21*100-100,adv:100*up/covered,covered,total:covered,carried,old};
   }
   function card(p,price,split) {
