@@ -199,7 +199,7 @@ function strikeRow(p,gate,alt){
     <span>止蝕 <b class="neg">$${p.stop}</b></span>
     <span>目標 <b class="pos">$${p.tgt}</b></span>
    </div>
-   <div class="lab" style="margin-top:5px">${p.why}</div>
+   <div class="lab" style="margin-top:5px">${p.why}</div><div class="lab live-quote" data-live-symbol="${p.t}"></div>
   </div>`;
 }
 function render(){
@@ -238,6 +238,7 @@ function render(){
   ((D.earn.unk&&D.earn.unk.length)?`<b>Reported today · timing unconfirmed°</b> (calendar gave no time; likely already out pre-market): ${decorate(D.earn.unk)}<br>`:``)+
   `<b>Next session</b> (${D.earn.nx}) — pre: ${decorate(D.earn.nxt_pre)}; after: ${decorate(D.earn.nxt_aft)}`;
  document.getElementById("upd").textContent="Data date: "+D.date;
+ if(window.MassiveLive)MassiveLive.packetChanged(D);
  const s=document.getElementById("dsel");
  for(const o of s.options){if(o.value===D.date.replaceAll("-","")){s.value=o.value;break}}
 }
@@ -248,7 +249,7 @@ function renderRows(){
   const w=(g.sig>4||g.sig>Math.abs(g.med)*3)?" ⚠":"";
   const open=openG===g.g;
   const mem=(D.members&&D.members[g.g]||[]).map(m=>
-   `<span class="mchip" onclick="event.stopPropagation();showT('${m.t}')">${m.t} <b class="${cls(m.c)}">${fp(m.c,1)}</b>${m.e?`<span class="e" onclick="event.stopPropagation();showEPS('${m.t}')">E</span>`:''}<small>${short(nm(m.t),16)}</small></span>`).join("");
+   `<span class="mchip" onclick="event.stopPropagation();showT('${m.t}')">${m.t} <b class="${cls(m.c)}">${fp(m.c,1)}</b>${m.e?`<span class="e" onclick="event.stopPropagation();showEPS('${m.t}')">E</span>`:''}<small>${short(nm(m.t),16)}</small><small class="live-quote" data-live-symbol="${m.t}"></small></span>`).join("");
   return `<div class="grow" data-g="${g.g}" onclick="tgG('${g.g}')"><div class="row"><span class="caret">${open?"▼":"▶"}</span><div class="gname">${GN[g.g]||g.name}</div>${spark(D.ghist[g.g])}
    <div class="gmed ${cls(g.med)}">${fp(g.med)}</div>
    <div class="gsub">adv ${g.up}% · pos ${g.rp.toFixed(2)}<br>σ ${g.sig.toFixed(1)}${w}</div></div>
@@ -305,6 +306,8 @@ async function showT(t){
   ${epsLine(t)}
   ${(D.wp&&D.wp[t])?`<div style="margin-top:8px;padding:8px;border:1px solid #2a3350;border-radius:8px"><div class="lab" style="margin-bottom:4px">⚑ Earnings watch — beyond EPS (next session)</div>${D.wp[t].map((w,i)=>`<div style="font-size:12.5px;line-height:1.5">${i+1}. ${w}</div>`).join("")}</div>`:``}
   <div id="tchart" style="margin-top:8px">${spark(sh,120,30)}<div class="lab">loading YTD chart…</div></div>`;
+ const liveEl=document.createElement("div");liveEl.className="lab live-quote";liveEl.dataset.liveSymbol=t;d.querySelector("b").after(liveEl);
+ if(window.MassiveLive)MassiveLive.paint();
  d.style.display="block";window.scrollTo({top:0,behavior:"smooth"});
  try{LASTC=await fetchEnc("charts/"+t+".enc");drawTickChart();}
  catch(e){const el=document.getElementById("tchart");if(el)el.innerHTML=spark(sh,120,30)+`<div class="lab">YTD chart unavailable · trend = last ${sh.length} daily % moves</div>`;}
@@ -543,4 +546,6 @@ tryCache();
 })();
 
 </script>
+<script defer src="massive_live_core.js?v=20261004"></script>
+<script defer src="massive_live.js?v=20261004"></script>
 </body></html>
