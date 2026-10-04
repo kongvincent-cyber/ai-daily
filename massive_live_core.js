@@ -18,6 +18,30 @@
     if (!Number.isFinite(t) || t < 946684800000 || t > now + 60000) return null;
     return Math.floor(t);
   }
+  // Provider status packets must not conflate valid-key limits with bad credentials.
+  function classifyStatus(event,key='') {
+    if(!event||event.ev!=='status')return {kind:'info',code:'',reason:''};
+    const rawCode=typeof event.status==='string'?event.status.trim().toLowerCase():'';
+    const rawReason=[event.message,event.reason,event.error].find(x=>typeof x==='string')||'';
+    function safe(value,limit) {
+      let text=value;
+      if(typeof key==='string'&&key) {
+        text=text.split(key).join('[redacted]');
+        try {const encoded=encodeURIComponent(key);if(encoded!==key)text=text.split(encoded).join('[redacted]');}catch(_){}
+      }
+      return text.replace(/[A-Za-z0-9_-]{24,}/g,'[redacted]').replace(/[\u0000-\u001f\u007f]/g,' ').replace(/\s+/g,' ').trim().slice(0,limit);
+    }
+    const code=safe(rawCode,64).replace(/[\s-]+/g,'_'),reason=safe(rawReason,240);
+    const text=(rawCode+' '+rawReason.toLowerCase()).replace(/[_-]+/g,' ');
+    let kind='info';
+    if(['connected','auth_success','success','subscribed','subscription_success'].includes(code))return {kind:'ok',code,reason};
+    // The service can report its account-wide connection limit as auth_failed.
+    if(/\b(?:max(?:imum)?[\s_-]+(?:[a-z]+[\s_-]+){0,4}connections?|connection[\s_-]+limit|too[\s_-]+many[\s_-]+(?:concurrent[\s_-]+)?connections?|connections?[\s_-]+(?:limit|exceeded))\b/i.test(text))kind='connection_limit';
+    else if(code==='auth_failed'||code==='authentication_failed')kind='auth';
+    else if(code==='not_authorized'||/\bnot[\s_-]+authori[sz]ed\b|\b(?:subscription|entitlement)[\s_-]+(?:required|denied|missing)\b/i.test(text))kind='entitlement';
+    else if(code==='error'||code==='protocol_error')kind='protocol';
+    return {kind,code,reason};
+  }
   class Book {
     constructor(symbols) { this.symbols = new Set(symbols); this.rows = new Map(); }
     row(t) { if (!this.rows.has(t)) this.rows.set(t,{ticker:t}); return this.rows.get(t); }
@@ -102,5 +126,5 @@
     if (price>=p.zone?.[0] && price<=p.zone?.[1]) return '在承接區；仍需收市確認';
     return `距突破 ${((p.bo/price-1)*100).toFixed(2)}%`;
   }
-  return {Book,day,timestamp,splitFactors,layer,card};
+  return {Book,day,timestamp,classifyStatus,splitFactors,layer,card};
 });

@@ -4,7 +4,7 @@
   const C=window.MassiveLiveCore, savedName='ai-daily.massive.key.v1';
   if (!C) return;
   const state={key:'',book:null,baseline:null,market:null,factors:null,ws:null,generation:0,failures:0,
-    phase:'未連接',detail:'',latest:null,quotes:[],controllers:new Set(),owner:crypto.randomUUID(),enabled:false};
+    phase:'未連接',detail:'',dataDetail:'',socketFailure:null,latest:null,quotes:[],controllers:new Set(),owner:crypto.randomUUID(),enabled:false};
   let cardEl,feedEl,tableEl,layerEl,statusEl,keyEl,rememberEl,leaseRelease,leaseTimer,leaseFallback=false;
   let reconnectTimer,handshakeTimer,stableTimer,refreshTimer,paintTimer,started=false,lastPacketDate='';
   const money=x=>Number.isFinite(x)?'$'+x.toFixed(x<1?4:2):'—';
@@ -72,12 +72,20 @@
       }
     } catch(_) {warnings.push('拆股基準未核實；盤中指數暫停');}
     if(g!==state.generation)return;
-    state.detail=warnings.join(' · ');paint();
+    state.dataDetail=warnings.join(' · ');paint();
+  }
+  function closeSocket() {
+    clearTimeout(reconnectTimer);clearTimeout(handshakeTimer);clearTimeout(stableTimer);
+    const old=state.ws;state.ws=null;state.authenticated=false;
+    if(old){old.onclose=null;old.onmessage=null;old.onerror=null;old.close();}
   }
   function clearTransport() {
-    clearTimeout(reconnectTimer);clearTimeout(handshakeTimer);clearTimeout(stableTimer);clearInterval(refreshTimer);
+    closeSocket();clearInterval(refreshTimer);
     for(const ac of state.controllers)ac.abort();state.controllers.clear();
-    const old=state.ws;state.ws=null;if(old){old.onclose=null;old.onmessage=null;old.onerror=null;old.close();}
+  }
+  function socketFallback(phase,detail) {
+    // A stream refusal must not abort an independently working REST snapshot.
+    state.socketFailure={phase,detail};closeSocket();releaseLease();message(phase,detail);
   }
   function releaseLease() {
     if(leaseRelease){leaseRelease();leaseRelease=null;}
@@ -85,7 +93,7 @@
     if(leaseFallback)try {const x=JSON.parse(localStorage.getItem('ai-daily.massive.lease')||'null');if(x?.owner===state.owner)localStorage.removeItem('ai-daily.massive.lease');}catch(_){}
     leaseFallback=false;
   }
-  function stop(phase='已暫停',detail='') {state.generation++;clearTransport();releaseLease();message(phase,detail);}
+  function stop(phase='已暫停',detail='') {state.generation++;clearTransport();releaseLease();state.dataDetail='';message(phase,detail);}
   async function acquireLease(g) {
     if(navigator.locks) {
       return new Promise(resolve=>{
@@ -124,7 +132,7 @@
     if(g!==state.generation||!state.key||document.hidden)return;
     state.authenticated=false;state.quotes=[];
     let ws;
-    try {ws=new WebSocket('wss://socket.massive.com/stocks');}catch(_){state.enabled=false;stop('實時連線未能建立','按重新連線再試。');return;}
+    try {ws=new WebSocket('wss://socket.massive.com/stocks');}catch(_){socketFallback('串流連線未能建立','價格快照繼續每分鐘更新；按重新連線再試。');return;}
     state.ws=ws;
     message('連線中');
     handshakeTimer=setTimeout(()=>{if(state.ws===ws){state.detail='連線驗證逾時';ws.close();}},20000);
@@ -134,9 +142,14 @@
       let xs;try{xs=JSON.parse(ev.data);}catch(_){return;}if(!Array.isArray(xs))return;
       for(const x of xs) {
         if(x.ev==='status') {
-          if(x.status==='auth_failed'||x.status==='not_authorized'||x.status==='error') {state.enabled=false;stop('驗證或行情訂閱未通過','請核對 Massive key 及實時行情權限。');return;}
+          const failure=C.classifyStatus(x,state.key);
+          if(['connection_limit','auth','entitlement','protocol'].includes(failure.kind)) {
+            const phases={connection_limit:'串流連線數已滿',auth:'串流驗證未通過',entitlement:'串流行情權限未通過',protocol:'串流請求未通過'};
+            const hints={connection_limit:'關閉其他使用同一帳戶嘅實時連線，等 30 秒後按重新連線。',auth:'Massive 拒絕串流驗證；快照權限另行核實。',entitlement:'Massive 拒絕呢個串流頻道；請核對 Stocks 實時權限及已簽協議。',protocol:'Massive 拒絕串流請求；價格快照繼續更新。'};
+            socketFallback(phases[failure.kind],`Massive [${failure.code}]${failure.reason?' '+failure.reason:''} · ${hints[failure.kind]}`);return;
+          }
           if(x.status==='auth_success') {
-            clearTimeout(handshakeTimer);state.authenticated=true;
+            clearTimeout(handshakeTimer);state.authenticated=true;state.socketFailure=null;
             ws.send(JSON.stringify({action:'subscribe',params:symbols().map(t=>'A.'+t).join(',')}));
             updateQuotes();message('已連線 · 等候行情');
             stableTimer=setTimeout(()=>{if(state.ws===ws)state.failures=0;},60000);
@@ -148,20 +161,23 @@
     ws.onclose=()=>{
       if(g!==state.generation||state.ws!==ws)return;
       clearTimeout(handshakeTimer);clearTimeout(stableTimer);state.ws=null;state.authenticated=false;
-      if(++state.failures>5){state.enabled=false;stop('重連已暫停','已試 5 次；保留最後報價，按「重新連線」再試。');return;}
-      const delay=Math.min(30000,1000*2**(state.failures-1))+Math.floor(Math.random()*500);
+      if(++state.failures>5){socketFallback('串流重連已暫停','已試 5 次；價格快照繼續每分鐘更新，按「重新連線」再試。');return;}
+      // Massive may take 10–30 seconds to release a dropped account slot.
+      const delay=30000+Math.floor(Math.random()*500);
       message('斷線 · 自動重連 '+state.failures+'/5');
       reconnectTimer=setTimeout(()=>{connectSocket(g);refresh(g);},delay);
     };
   }
-  async function start() {
+  async function start(resetSocket=false) {
     if(!state.key||document.hidden)return;
     state.enabled=true;
+    if(resetSocket)state.socketFailure=null;
     stop('準備實時連線');const g=state.generation;
-    if(!await acquireLease(g)){if(g===state.generation)message('另一分頁使用實時連線','每個 Stocks 帳戶預設只容許一條 WebSocket。');return;}
+    refresh(g);refreshTimer=setInterval(()=>refresh(g),60000);
+    if(state.socketFailure){message(state.socketFailure.phase,state.socketFailure.detail);return;}
+    if(!await acquireLease(g)){if(g===state.generation)message('另一分頁使用實時連線','呢個分頁每分鐘查詢價格快照。');return;}
     if(g!==state.generation){releaseLease();return;}
-    state.failures=0;connectSocket(g);refresh(g);
-    refreshTimer=setInterval(()=>refresh(g),60000);
+    state.failures=0;connectSocket(g);
   }
   function priceLine(t,now) {
     const r=state.book?.rows.get(t);
@@ -177,10 +193,11 @@
     const marketFresh=market&&Math.abs(now-Date.parse(market.serverTime))<180000;
     const active=marketFresh&&(market.market==='open'||market.earlyHours||market.afterHours);
     const session=marketFresh?(market.earlyHours?'盤前':market.afterHours?'盤後':market.market==='open'?'正常交易時段':'休市'):'市場狀態未核實';
-    const status=`${session} · ${state.phase}${state.detail?' · '+state.detail:''}`;
+    const detail=[state.detail,state.dataDetail].filter(Boolean).join(' · ');
+    const status=`${session} · ${state.phase}${detail?' · '+detail:''}`;
     if(statusEl.textContent!==status)statusEl.textContent=status;
     const rows=[...state.book.rows.values()],fresh=rows.filter(r=>r.priceAt&&now-r.priceAt<120000&&C.day(r.priceAt)===C.day(now)).length;
-    feedEl.textContent=`${rows.filter(r=>r.price).length}/${state.book.symbols.size} 價格 · ${active?fresh+' 個近兩分鐘有成交':'顯示最後可用行情'} · 每秒刷新畫面`;
+    feedEl.textContent=`${rows.filter(r=>r.price).length}/${state.book.symbols.size} 價格 · ${active?fresh+' 個近兩分鐘有成交':'顯示最後可用行情'} · ${state.socketFailure||!state.authenticated?'每分鐘查詢快照 · ':''}每秒刷新畫面`;
     const historical=typeof D!=='undefined'&&D&&D.date!==state.latest.date;
     document.querySelectorAll('[data-live-symbol]').forEach(el=>{
       el.hidden=historical;
@@ -230,13 +247,13 @@
   async function mount() {
     if(started||typeof D==='undefined'||!D||typeof KEY==='undefined'||!KEY)return;
     started=true;state.latest=D;lastPacketDate=D.date;state.book=new C.Book(symbols());
-    const css=node('style','.massive-price-row{display:grid;grid-template-columns:70px minmax(0,1fr);gap:3px 8px;padding:7px 0;border-bottom:1px solid #2a3448;font-size:12px}.massive-price-row small{grid-column:2;overflow-wrap:anywhere;color:#8a93a6}.massive-price-row button{align-self:start}.massive-live .lab{overflow-wrap:anywhere}.massive-live summary{cursor:pointer;padding:7px 0}.massive-live input{max-width:100%;box-sizing:border-box}.live-quote{display:block;color:#83bae9;font-size:10px;margin-top:3px}.massive-live-controls{display:flex;flex-wrap:wrap;gap:7px;margin:7px 0}');document.head.append(css);
+    const css=node('style','.massive-price-row{display:grid;grid-template-columns:70px minmax(0,1fr);gap:3px 8px;padding:7px 0;border-bottom:1px solid #2a3448;font-size:12px}.massive-price-row small{grid-column:2;overflow-wrap:anywhere;color:#8a93a6}.massive-price-row button{align-self:start}.massive-live{min-width:0;max-width:100%;overflow-wrap:anywhere}.massive-live .lab{overflow-wrap:anywhere;min-width:0}.massive-live summary{cursor:pointer;padding:7px 0}.massive-live input{max-width:100%;box-sizing:border-box;font-size:16px}.live-quote{display:block;color:#83bae9;font-size:10px;margin-top:3px}.massive-live-controls{display:flex;flex-wrap:wrap;gap:7px;margin:7px 0}');document.head.append(css);
     cardEl=node('section',null,'card massive-live');cardEl.id='massive-live';
     cardEl.append(node('b','Massive · 實時行情'));
     statusEl=node('div','未連接','lab');statusEl.setAttribute('role','status');cardEl.append(statusEl);
     feedEl=node('div',null,'lab');cardEl.append(feedEl);
     const controls=node('div',null,'massive-live-controls');
-    const retry=node('button','重新連線');retry.type='button';retry.onclick=()=>state.key?start():setup.open=true;
+    const retry=node('button','重新連線');retry.type='button';retry.onclick=()=>state.key?start(true):setup.open=true;
     const pause=node('button','暫停');pause.type='button';pause.onclick=()=>{state.enabled=false;stop('已暫停');};
     const forget=node('button','清除本機 key');forget.type='button';forget.onclick=()=>{state.enabled=false;stop('未連接');state.key='';localStorage.removeItem(savedName);setup.open=true;};
     controls.append(retry,pause,forget);cardEl.append(controls);
@@ -249,7 +266,7 @@
       e.preventDefault();const key=keyEl.value.trim();keyEl.value='';if(!key){message('請輸入 Massive API key');return;}
       state.key=key;
       try {if(rememberEl.checked)await rememberKey(key);else localStorage.removeItem(savedName);}catch(_){message('本機未能儲存；今次連線仍可使用。');}
-      setup.open=false;await start();
+      setup.open=false;await start(true);
     };
     setup.append(form,node('div','Key 只供呢部裝置向 Massive 連線，唔會上傳到 GitHub。唔好喺對話貼 key。','lab'));
     const dashboard=node('a','前往 Massive Dashboard 取得 API key');dashboard.href='https://massive.com/dashboard';dashboard.target='_blank';dashboard.rel='noopener noreferrer';setup.append(dashboard);cardEl.append(setup);
