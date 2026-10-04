@@ -71,6 +71,7 @@
     const active = market && (market.market === 'open' || market.earlyHours || market.afterHours);
     if (!spec || !active || !factors || baseline.asof > today ||
         Date.parse(today)-Date.parse(baseline.asof) > 7*86400000) return {ready:false,reason:'休市或基準未核實'};
+    if(baseline.asof<today&&baseline.next_session!==today)return {ready:false,reason:'收市基準日期未跟上'};
     let sum=0,up=0,covered=0,carried=0,old=0;
     for (const t of spec.members) {
       const b = Number(baseline.closes[t])*factors[t], r=book.rows.get(t);
