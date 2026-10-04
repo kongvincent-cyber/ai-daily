@@ -190,7 +190,7 @@ function showGate(){
 function strikeRow(p,gate,alt){
  return `<div style="margin-top:8px;padding:8px 9px;border:1px ${alt?"dashed #3a4458":"solid #2a3448"};border-radius:8px;${gate==="停手"?"opacity:.55":""}${alt?"opacity:.85":""}">
    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px">
-    <span><b style="cursor:pointer;border-bottom:1px dotted #5c6577;font-size:${alt?"13.5":"14.5"}px" onclick="showT('${p.t}')">${p.t}</b> <small style="color:#8a93a6">${short(nm(p.t)||"",14)} · ${p.lay} · close $${p.c}</small></span>
+    <span><b style="cursor:pointer;border-bottom:1px dotted #5c6577;font-size:${alt?"13.5":"14.5"}px" onclick="showT('${p.t}')">${p.t}</b> <small style="color:#8a93a6">${short(nm(p.t)||"",14)} · ${p.lay} · 收市價 $${p.c}</small></span>
     <span style="font-size:11px;color:#aeb7c9;flex-shrink:0">${p.state} · R:R ${p.rr}</span>
    </div>
    <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px 10px;font-size:12.5px;margin-top:6px;line-height:1.45">
@@ -546,6 +546,6 @@ tryCache();
 })();
 
 </script>
-<script defer src="massive_live_core.js?v=20261004-auth2"></script>
-<script defer src="massive_live.js?v=20261004-auth2"></script>
+<script defer src="massive_live_core.js?v=20261004-auto1"></script>
+<script defer src="massive_live.js?v=20261004-auto1"></script>
 </body></html>

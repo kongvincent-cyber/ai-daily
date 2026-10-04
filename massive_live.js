@@ -181,7 +181,7 @@
   }
   function priceLine(t,now) {
     const r=state.book?.rows.get(t);
-    if(!r?.price)return 'Massive：等候報價';
+    if(!r?.price)return '等候報價';
     const base=state.baseline?.closes?.[t],factor=state.factors?.[t];
     const change=base&&factor?` · ${pct((r.price/(base*factor)-1)*100)} vs ${state.baseline.asof} 收市`:'';
     const age=now-r.priceAt;
@@ -197,13 +197,13 @@
     const status=`${session} · ${state.phase}${detail?' · '+detail:''}`;
     if(statusEl.textContent!==status)statusEl.textContent=status;
     const rows=[...state.book.rows.values()],fresh=rows.filter(r=>r.priceAt&&now-r.priceAt<120000&&C.day(r.priceAt)===C.day(now)).length;
-    feedEl.textContent=`${rows.filter(r=>r.price).length}/${state.book.symbols.size} 價格 · ${active?fresh+' 個近兩分鐘有成交':'顯示最後可用行情'} · ${state.socketFailure||!state.authenticated?'每分鐘查詢快照 · ':''}每秒刷新畫面`;
+    feedEl.textContent=`${rows.filter(r=>r.price).length}/${state.book.symbols.size} 價格 · ${active?fresh+' 個近兩分鐘有成交':'顯示最後可用行情'} · ${state.socketFailure||!state.authenticated?'每分鐘查詢快照 · ':''}每秒自動更新畫面，毋須手動刷新`;
     const historical=typeof D!=='undefined'&&D&&D.date!==state.latest.date;
     document.querySelectorAll('[data-live-symbol]').forEach(el=>{
       el.hidden=historical;
       if(!historical) {
         const r=state.book.rows.get(el.dataset.liveSymbol);el.title=priceLine(el.dataset.liveSymbol,now);
-        el.textContent=el.closest('.mchip')?(r?.price?'行情 '+money(r.price)+' · '+clock(r.priceAt)+(now-r.priceAt>120000?' · 最後價':''):'行情 等候報價'):'行情 '+priceLine(el.dataset.liveSymbol,now);
+        el.textContent=el.closest('.mchip')?(r?.price?'最新價 '+money(r.price)+' · '+clock(r.priceAt)+(now-r.priceAt>120000?' · 最後價':''):'最新價 等候報價'):'最新價 '+priceLine(el.dataset.liveSymbol,now);
       }
     });
     const warning=cardEl.querySelector('[data-history-warning]');warning.textContent=historical?'你正查閱歷史日；下方實時區獨立顯示今日行情。':'';
@@ -247,7 +247,7 @@
   async function mount() {
     if(started||typeof D==='undefined'||!D||typeof KEY==='undefined'||!KEY)return;
     started=true;state.latest=D;lastPacketDate=D.date;state.book=new C.Book(symbols());
-    const css=node('style','.massive-price-row{display:grid;grid-template-columns:70px minmax(0,1fr);gap:3px 8px;padding:7px 0;border-bottom:1px solid #2a3448;font-size:12px}.massive-price-row small{grid-column:2;overflow-wrap:anywhere;color:#8a93a6}.massive-price-row button{align-self:start}.massive-live{min-width:0;max-width:100%;overflow-wrap:anywhere}.massive-live .lab{overflow-wrap:anywhere;min-width:0}.massive-live summary{cursor:pointer;padding:7px 0}.massive-live input{max-width:100%;box-sizing:border-box;font-size:16px}.live-quote{display:block;color:#83bae9;font-size:10px;margin-top:3px}.massive-live-controls{display:flex;flex-wrap:wrap;gap:7px;margin:7px 0}');document.head.append(css);
+    const css=node('style','.massive-price-row{display:grid;grid-template-columns:70px minmax(0,1fr);gap:3px 8px;padding:7px 0;border-bottom:1px solid #2a3448;font-size:12px}.massive-price-row small{grid-column:2;overflow-wrap:anywhere;color:#8a93a6}.massive-price-row button{align-self:start}.massive-live{min-width:0;max-width:100%;overflow-wrap:anywhere}.massive-live .lab{overflow-wrap:anywhere;min-width:0}.massive-live summary{cursor:pointer;padding:7px 0}.massive-live input{max-width:100%;box-sizing:border-box;font-size:16px}.live-quote,.mchip .live-quote{display:block;color:#83bae9;font-size:13px;font-weight:600;margin-top:3px}.massive-live-controls{display:flex;flex-wrap:wrap;gap:7px;margin:7px 0}');document.head.append(css);
     cardEl=node('section',null,'card massive-live');cardEl.id='massive-live';
     cardEl.append(node('b','Massive · 實時行情'));
     statusEl=node('div','未連接','lab');statusEl.setAttribute('role','status');cardEl.append(statusEl);
