@@ -253,6 +253,7 @@ function renderRows(){
   return `<div class="grow" data-g="${g.g}" onclick="tgG('${g.g}')"><div class="row"><span class="caret">${open?"▼":"▶"}</span><div class="gname">${GN[g.g]||g.name}</div>${spark(D.ghist[g.g])}
    <div class="gmed ${cls(g.med)}">${fp(g.med)}</div>
    <div class="gsub">adv ${g.up}% · pos ${g.rp.toFixed(2)}<br>σ ${g.sig.toFixed(1)}${w}</div></div>
+   <div class="lab">收市分析 · ${D.date}</div><div class="lab live-quote" data-live-layer="${g.g}"></div>
    <div class="mem${open?" open":""}">${mem}</div></div>`;
  }).join("");
  document.getElementById("sbtn").textContent=mode==="med"?"Sort: median %":"Sort: σ dispersion";
@@ -299,9 +300,9 @@ async function showT(t){
  d.innerHTML=`<span class="x" onclick="document.getElementById('det').style.display='none'">✕</span>
   <b>${t}</b> <span style="color:#aeb7c9">${nm(t)}</span> <span class="lab">${GN[m.g]||m.g}</span>${m.e?`<span class="e" style="cursor:pointer" onclick="showEPS('${t}')">reported past 24h — tap for est vs actual</span>`:''}
   <div style="display:flex;gap:14px;align-items:center;margin-top:6px">
-   <div><div class="lab">Day</div><div class="val ${cls(m.c)}" style="font-size:16px">${fp(m.c,1)}</div></div>
-   <div><div class="lab">Open gap</div><div class="val ${cls(m.gp)}" style="font-size:16px">${fp(m.gp,1)}</div></div>
-   <div><div class="lab">Close pos</div><div class="val" style="font-size:16px">${m.rp.toFixed(2)}</div></div>
+   <div><div class="lab">收市升跌 ${D.date}</div><div class="val ${cls(m.c)}" style="font-size:16px">${fp(m.c,1)}</div></div>
+   <div><div class="lab">該日開市缺口</div><div class="val ${cls(m.gp)}" style="font-size:16px">${fp(m.gp,1)}</div></div>
+   <div><div class="lab">該日收市位置</div><div class="val" style="font-size:16px">${m.rp.toFixed(2)}</div></div>
   </div>
   ${epsLine(t)}
   ${(D.wp&&D.wp[t])?`<div style="margin-top:8px;padding:8px;border:1px solid #2a3350;border-radius:8px"><div class="lab" style="margin-bottom:4px">⚑ Earnings watch — beyond EPS (next session)</div>${D.wp[t].map((w,i)=>`<div style="font-size:12.5px;line-height:1.5">${i+1}. ${w}</div>`).join("")}</div>`:``}
@@ -309,7 +310,7 @@ async function showT(t){
  const liveEl=document.createElement("div");liveEl.className="lab live-quote";liveEl.dataset.liveSymbol=t;d.querySelector("b").after(liveEl);
  if(window.MassiveLive)MassiveLive.paint();
  d.style.display="block";window.scrollTo({top:0,behavior:"smooth"});
- try{LASTC=await fetchEnc("charts/"+t+".enc");drawTickChart();}
+ try{const chart=await fetchEnc("charts/"+t+".enc");if(d.querySelector('[data-live-symbol]')?.dataset.liveSymbol!==t)return;LASTC=chart;drawTickChart();}
  catch(e){const el=document.getElementById("tchart");if(el)el.innerHTML=spark(sh,120,30)+`<div class="lab">YTD chart unavailable · trend = last ${sh.length} daily % moves</div>`;}
 }
 function srch(q){
@@ -546,6 +547,6 @@ tryCache();
 })();
 
 </script>
-<script defer src="massive_live_core.js?v=20261004-auto1"></script>
-<script defer src="massive_live.js?v=20261004-auto1"></script>
+<script defer src="massive_live_core.js?v=20261005-intraday1"></script>
+<script defer src="massive_live.js?v=20261005-intraday1"></script>
 </body></html>
