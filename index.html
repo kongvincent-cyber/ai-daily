@@ -66,8 +66,8 @@ button{background:#1b2230;color:#aeb7c9;border:1px solid #2a3448;border-radius:8
 <h2 id="closing-label">收市分析</h2>
 <div class="kpi" id="kpi"></div>
 <div id="ttags"></div>
-<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px"><h2 style="margin:0">Group strength · tap a row to expand</h2><button id="sbtn" onclick="tg(event)">Sort: median %</button></div><div id="grows"></div></div>
-<h2>Top 5 ↑ / Bottom 5 ↓ · tap for detail</h2><div class="tags" id="tb"></div>
+<div class="card"><h2 id="group-title" style="margin:0">Group strength</h2><div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0"><button id="sbtn" onclick="tg(event)">Sort: median %</button><button id="ranking-view" onclick="window.MassiveLive?.toggleRankings()">顯示收市分析</button></div><div id="group-status" class="lab"></div><div id="grows"></div></div>
+<h2 id="top-title">Top 5 ↑ / Bottom 5 ↓</h2><div id="top-status" class="lab" style="margin-bottom:6px"></div><div class="tags" id="tb"></div>
 <h2>Gap monitor <span style="color:#5c6577;font-weight:400;font-size:11px">· tap for meaning</span></h2><div class="card" id="gap" style="font-size:13px;cursor:pointer" onclick="showGap()"></div>
 <h2>Earnings nodes</h2><div class="card earn" id="earn"></div>
 <h2>Recent track</h2><div class="trend" id="trend"></div><div class="hist" id="hist"></div>
@@ -251,16 +251,17 @@ function renderRows(){
   const w=(g.sig>4||g.sig>Math.abs(g.med)*3)?" ⚠":"";
   const open=openG===g.g;
   const mem=(D.members&&D.members[g.g]||[]).map(m=>
-   `<span class="mchip" onclick="event.stopPropagation();showT('${m.t}')">${m.t} <b class="${cls(m.c)}">${fp(m.c,1)}</b>${m.e?`<span class="e" onclick="event.stopPropagation();showEPS('${m.t}')">E</span>`:''}<small>${short(nm(m.t),16)}</small><small class="live-quote" data-live-symbol="${m.t}"></small></span>`).join("");
+   `<span class="mchip" onclick="event.stopPropagation();showT('${m.t}')">${m.t} <b data-member-return="${m.t}" class="${cls(m.c)}">${fp(m.c,1)}</b>${m.e?`<span class="e" onclick="event.stopPropagation();showEPS('${m.t}')">E</span>`:''}<small>${short(nm(m.t),16)}</small><small class="live-quote" data-live-symbol="${m.t}"></small></span>`).join("");
   return `<div class="grow" data-g="${g.g}" onclick="tgG('${g.g}')"><div class="row"><span class="caret">${open?"▼":"▶"}</span><div class="gname">${GN[g.g]||g.name}</div>${spark(D.ghist[g.g])}
    <div class="gmed ${cls(g.med)}">${fp(g.med)}</div>
    <div class="gsub">adv ${g.up}% · pos ${g.rp.toFixed(2)}<br>σ ${g.sig.toFixed(1)}${w}</div></div>
-   <div class="lab">收市分析 · ${D.date}</div><div class="lab live-quote" data-live-layer="${g.g}"></div>
+   <div class="lab" data-group-caption>收市分析 · ${D.date}</div><div class="lab live-quote" data-live-layer="${g.g}"></div>
    <div class="mem${open?" open":""}">${mem}</div></div>`;
  }).join("");
  document.getElementById("sbtn").textContent=mode==="med"?"Sort: median %":"Sort: σ dispersion";
  try{window.LBGlue&&LBGlue.afterGroupTable();}catch(e){console.warn(e)}
  try{window.LBGlue&&LBGlue.afterLevelDetail();}catch(e){console.warn(e)}
+ window.MassiveLive?.paintRankings();
 }
 async function tgTag(i){const e=document.getElementById("tagx"+i);const open=e.style.display==="none";e.style.display=open?"block":"none";
  if(open&&!e.dataset.c){e.dataset.c="1";
@@ -549,6 +550,6 @@ tryCache();
 })();
 
 </script>
-<script defer src="massive_live_core.js?v=20261005-intraday1"></script>
-<script defer src="massive_live.js?v=20261005-intraday1"></script>
+<script defer src="massive_live_core.js?v=20261005-rankings1"></script>
+<script defer src="massive_live.js?v=20261005-rankings1"></script>
 </body></html>

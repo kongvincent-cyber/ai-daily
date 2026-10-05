@@ -155,6 +155,31 @@
     const ema21=baseline.asof<today ? spec.ema21+(index-spec.ema21)/11 : spec.ema21+(index-spec.close)/11;
     return {ready:true,index,change,ema21,above21:index/ema21*100-100,adv:100*up/covered,covered,total:covered,carried,old};
   }
+  // Rankings use eligible aggregate prices, original membership and verified prior closes.
+  // Missing / prior-session observations are excluded explicitly, never recycled as today's movers.
+  function rankings(baseline,book,factors,now) {
+    const today=day(now),groups={},rows=[];
+    if(!baseline||!factors||baseline.next_session!==today||baseline.asof>=today)
+      return {ready:false,reason:'今日前收基準待核實',groups,rows};
+    for(const [g,spec] of Object.entries(baseline.layers)) {
+      const members=[];
+      for(const t of spec.members) {
+        const b=Number(baseline.closes[t])*factors[t],r=book.rows.get(t);
+        if(!pos(b)||!pos(r?.price)||day(r.priceAt)!==today||!pos(r.previousClose)||
+          Math.min(Math.abs(r.previousClose-b),Math.abs(r.previousClose*factors[t]-b))>Math.max(.015,b*.0005))continue;
+        const x={t,g,c:100*(r.price/b-1),at:r.priceAt,old:now-r.priceAt>120000};members.push(x);rows.push(x);
+      }
+      const sorted=members.map(x=>x.c).sort((a,b)=>a-b),n=sorted.length,mean=n?sorted.reduce((a,b)=>a+b,0)/n:0;
+      groups[g]={ready:n===spec.members.length,covered:n,total:spec.members.length,
+        med:n?(sorted[Math.floor((n-1)/2)]+sorted[Math.floor(n/2)])/2:null,
+        sig:n?Math.sqrt(sorted.reduce((s,x)=>s+(x-mean)**2,0)/n):null,
+        up:n?100*members.filter(x=>x.c>0).length/n:null,old:members.filter(x=>x.old).length,
+        at:n?Math.max(...members.map(x=>x.at)):null};
+    }
+    rows.sort((a,b)=>b.c-a.c||a.t.localeCompare(b.t));
+    return {ready:true,groups,rows,total:Object.values(baseline.layers).reduce((s,g)=>s+g.members.length,0),
+      top:rows.filter(x=>x.c>0).slice(0,5),bottom:[...rows].reverse().filter(x=>x.c<0).slice(0,5)};
+  }
   function card(p,price,split) {
     if (!pos(price)) return '等候成交';
     if (split && split!==1) return '拆股後需核對原卡價位';
@@ -164,5 +189,5 @@
     if (price>=p.zone?.[0] && price<=p.zone?.[1]) return '在承接區；仍需收市確認';
     return `距突破 ${((p.bo/price-1)*100).toFixed(2)}%`;
   }
-  return {Book,Minutes,day,minuteET,timestamp,displayed,transport,classifyStatus,splitFactors,layer,card};
+  return {Book,Minutes,day,minuteET,timestamp,displayed,transport,classifyStatus,splitFactors,layer,rankings,card};
 });
