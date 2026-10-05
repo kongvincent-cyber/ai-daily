@@ -63,6 +63,7 @@ button{background:#1b2230;color:#aeb7c9;border:1px solid #2a3448;border-radius:8
 <div class="card" id="det"></div>
 <div class="chips" id="chips"></div>
 <div id="strike"></div>
+<h2 id="closing-label">收市分析</h2>
 <div class="kpi" id="kpi"></div>
 <div id="ttags"></div>
 <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px"><h2 style="margin:0">Group strength · tap a row to expand</h2><button id="sbtn" onclick="tg(event)">Sort: median %</button></div><div id="grows"></div></div>
@@ -210,6 +211,7 @@ function render(){
   `<span class="chip" style="cursor:pointer" onclick="showRegime()">${D.regime==="牛"?"Bull":"Bear"} · SPY vs 200DMA ${fp(D.spy.ma200,1)} <span style="color:#5c6577">ⓘ</span></span>`+
   (D.lead3.length?`<span class="chip">3-day leaders: ${D.lead3.map(g=>GN[g]||g).join(", ")}</span>`:"");
  renderStrike();
+ document.getElementById('closing-label').textContent='收市分析 · '+D.date+'（以下統計不是盤中報價）';
  document.getElementById("kpi").innerHTML=[
   ["SPY",fp(D.spy.chg),cls(D.spy.chg),"showSPY"],["QQQ",fp(D.qqq),cls(D.qqq),"showQQQ"],
   ["Capex − Software",fp(D.bloc.cap-D.bloc.sw)+"pp",cls(D.bloc.cap-D.bloc.sw),"showCapSw"],
