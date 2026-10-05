@@ -231,6 +231,7 @@ function render(){
  renderRows();
  document.getElementById("tb").innerHTML=
   D.top.map(x=>tagHtml(x,"pos")).join("")+D.bot.map(x=>tagHtml(x,"neg")).join("");
+ delete document.getElementById("tb").dataset.rankSignature;
  document.getElementById("gap").innerHTML=D.gapmon.n?
   `${D.gapmon.n} names gapped up >5% | open→close median <b class="${cls(D.gapmon.med)}">${fp(D.gapmon.med)}</b> | win rate <b>${D.gapmon.win}%</b><div class="lab" style="margin-top:4px">Whole universe: median gap ${fp(D.stats.gap)} → open→close ${fp(D.stats.o2c)}, advancers ${D.stats.up}%</div>`
   :"No >5% gap-ups today";
