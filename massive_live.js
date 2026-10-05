@@ -199,7 +199,7 @@
     const now=Date.now(),session=C.day(now),g=state.generation;
     let entry=state.charts.get(t);
     if(!entry||entry.minutes.session!==session) {
-      entry={minutes:new C.Minutes(session),attempt:0,pending:false};state.charts.set(t,entry);
+      entry={minutes:new C.FiveMinutes(session),attempt:0,pending:false};state.charts.set(t,entry);
       if(state.charts.size>10)state.charts.delete(state.charts.keys().next().value);
     }
     if(entry.pending||now-entry.attempt<60000)return;
@@ -219,24 +219,52 @@
     if(!box){box=node('section');box.dataset.intraday='';det.querySelector('[data-live-symbol]').after(box);}
     box.hidden=historical;if(historical)return;
     chartData(t);
-    const r=state.book.rows.get(t),p=C.displayed(r),entry=state.charts.get(t),bars=entry?.minutes.values()||[];
-    const signature=JSON.stringify([p,r?.bid,r?.ask,r?.quoteAt,bars,entry?.error,Math.floor(now/1000),state.enabled]);
+    const r=state.book.rows.get(t),p=C.displayed(r),entry=state.charts.get(t),bars=entry?.minutes.values(now)||[];
+    const signature=JSON.stringify([p,r?.bid,r?.ask,r?.quoteAt,bars,entry?.selected,entry?.error,Math.floor(now/1000),state.enabled]);
     if(box.dataset.signature===signature)return;box.dataset.signature=signature;box.replaceChildren();
     const base=state.baseline?.closes?.[t],factor=state.factors?.[t];
     const validBase=base&&factor&&state.baseline?.next_session===C.day(now);
     box.append(node('b','今日 '+C.day(now)+' · '+(p&&validBase?pct((p.price/(base*factor)-1)*100):'基準待核實')));
     box.append(node('div',r?.bid&&r?.ask?`買 ${money(r.bid)} / 賣 ${money(r.ask)} · ${clock(r.quoteAt)}${now-r.quoteAt>120000?' · 買賣盤過時':''}`:'等候即時買賣盤','lab'));
     if(bars.length) {
-      const W=536,H=160,pad=12,lo=Math.min(...bars.map(b=>b.c)),hi=Math.max(...bars.map(b=>b.c));
-      const x=t=>pad+(t-bars[0].t)/Math.max(60000,bars.at(-1).t-bars[0].t)*(W-2*pad);
-      const y=c=>pad+(hi-c)/Math.max(.01,hi-lo)*(H-2*pad);
-      const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.setAttribute('aria-label','今日分鐘價格圖');svg.setAttribute('role','img');svg.style.cssText='width:100%;background:#10151f;border-radius:8px;margin-top:8px';
-      const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',bars.map((b,i)=>`${!i||b.t-bars[i-1].t>120000?'M':'L'}${x(b.t).toFixed(2)},${y(b.c).toFixed(2)}`).join(' '));path.setAttribute('fill','none');path.setAttribute('stroke','#83bae9');path.setAttribute('stroke-width','2');svg.append(path);
-      const dot=document.createElementNS(svg.namespaceURI,'circle');dot.setAttribute('cx',x(bars.at(-1).t));dot.setAttribute('cy',y(bars.at(-1).c));dot.setAttribute('r','3');dot.setAttribute('fill','#83bae9');svg.append(dot);box.append(svg);
-      box.append(node('div',`今日分鐘收價 ${money(bars.at(-1).c)} · ${clock(bars[0].t)} → ${clock(bars.at(-1).at)}${bars.at(-1).complete?'':' · 本分鐘形成中'}${now-bars.at(-1).at>120000?' · 最後可用圖表資料':''}`,'lab'));
-    }else box.append(node('div','今日分鐘圖：等候合資格成交／載入歷史','lab'));
+      const selected=bars.find(b=>b.t===entry.selected)||bars.at(-1);
+      const time=t=>new Date(t).toLocaleTimeString('en-GB',{timeZone:'Asia/Hong_Kong',hour:'2-digit',minute:'2-digit',hour12:false});
+      const heading=node('div','5 分鐘 OHLC · 香港時間','lab');heading.style.marginTop='8px';box.append(heading);
+      const W=536,H=236,left=10,right=66,top=14,bottom=30;
+      const lo=Math.min(...bars.map(b=>b.l)),hi=Math.max(...bars.map(b=>b.h)),margin=Math.max((hi-lo)*.06,.01),low=lo-margin,high=hi+margin;
+      const start=bars[0].t,end=bars.at(-1).end,span=Math.max(300000,end-start);
+      const x=t=>left+(t-start)/span*(W-left-right),y=p=>top+(high-p)/(high-low)*(H-top-bottom);
+      const tick=Math.min(3.5,(W-left-right)/(span/300000)*.3);
+      const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.setAttribute('aria-label','今日五分鐘 OHLC bar chart');svg.setAttribute('role','img');svg.style.cssText='width:100%;background:#10151f;border-radius:8px;margin-top:6px;cursor:crosshair';
+      const add=(tag,attrs,text)=>{const el=document.createElementNS(svg.namespaceURI,tag);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,v);if(text!=null)el.textContent=text;svg.append(el);return el;};
+      for(let i=0;i<4;i++) {
+        const p=low+(high-low)*i/3,py=y(p);
+        add('line',{x1:left,x2:W-right,y1:py,y2:py,stroke:'#283145','stroke-width':.6});
+        add('text',{x:W-right+5,y:py+4,fill:'#9da7b9','font-size':12},money(p));
+      }
+      for(let i=0;i<4;i++) {
+        const at=start+span*i/3;
+        add('text',{x:x(at),y:H-9,fill:'#9da7b9','font-size':12,'text-anchor':i===0?'start':i===3?'end':'middle'},time(at));
+      }
+      const markerX=x(selected.t+150000);
+      add('line',{x1:markerX,x2:markerX,y1:top,y2:H-bottom,stroke:'#687b9a','stroke-width':1,'stroke-dasharray':'2 3'});
+      for(const b of bars) {
+        const px=x(b.t+150000),color=b.o==null?'#83bae9':b.c>=b.o?'#4cc38a':'#ff7a6b';
+        const d=`M${px},${y(b.h)}V${y(b.l)}`+(b.o==null?'':`M${px-tick},${y(b.o)}H${px}`)+`M${px},${y(b.c)}H${px+tick}`;
+        const path=add('path',{d,fill:'none',stroke:color,'stroke-width':b.t===selected.t?1.9:1.2,'data-ohlc':b.t,'data-open':b.o??'','data-high':b.h,'data-low':b.l,'data-close':b.c,'data-complete':b.complete});
+        const title=document.createElementNS(svg.namespaceURI,'title');title.textContent=`${time(b.t)}–${time(b.end)} 開 ${money(b.o)} 高 ${money(b.h)} 低 ${money(b.l)} 收 ${money(b.c)}`;path.append(title);
+      }
+      svg.onclick=e=>{
+        const rect=svg.getBoundingClientRect(),px=(e.clientX-rect.left)*W/rect.width;
+        entry.selected=bars.reduce((a,b)=>Math.abs(x(b.t+150000)-px)<Math.abs(x(a.t+150000)-px)?b:a).t;paint();
+      };box.append(svg);
+      const readout=node('div',`${time(selected.t)}–${time(selected.end)} · 開 ${money(selected.o)}　高 ${money(selected.h)}　低 ${money(selected.l)}　收 ${money(selected.c)}${selected.complete?' · 已完成':selected.end>now?' · 形成中':' · 待分鐘補齊'}${selected.o==null?' · 開價待完整分鐘資料':''}`,'lab');readout.dataset.barReadout='';box.append(readout);
+      const legend=node('div','左橫線＝開價；右橫線＝收價；直線＝高低 · 點選 bar 查看','lab');box.append(legend);
+      if(entry.selected!=null){const latest=node('button','返回最新一條');latest.type='button';latest.onclick=()=>{entry.selected=null;paint();};box.append(latest);}
+      if(now-bars.at(-1).at>120000)box.append(node('div','最後有成交區間 '+time(bars.at(-1).t)+'–'+time(bars.at(-1).end)+' · 尚未有較新合資格彙總','lab'));
+    }else box.append(node('div','今日五分鐘圖：等候 OHLC 行情／載入歷史','lab'));
     if(entry?.error)box.append(node('div',entry.error,'lab'));
-    box.append(node('div','逐筆成交可含特殊成交條件；分鐘圖及盤中指數沿用合資格彙總價，兩者可能不同。','lab'));
+    box.append(node('div','五分鐘 bars 包括盤前、盤中及盤後合資格成交；無成交時段留空。逐筆最新價可能與彙總收價不同。','lab'));
   }
   function paintRankings() {
     if(!started||!state.latest||typeof D==='undefined'||!D)return;

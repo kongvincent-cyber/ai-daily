@@ -111,6 +111,59 @@
     event(x,now) {return ['A','AM'].includes(x.ev)&&this.add(x.s??x.e,x.c,x.e,now,x.ev==='AM');}
     values(){return [...this.rows.values()].sort((a,b)=>a.t-b.t);}
   }
+  // Full OHLC is required: a close-only line cannot reconstruct highs, lows or opens.
+  // Completed minute bars replace second samples, including late provider corrections.
+  class FiveMinutes {
+    constructor(session){this.session=session;this.minutes=new Map();}
+    bar(x,t,at,now) {
+      t=timestamp(t,now);at=timestamp(at,now);
+      const o=Number(x.o),h=Number(x.h),l=Number(x.l),c=Number(x.c);
+      if(t===null||at===null||at<t||day(t)!==this.session||minuteET(t)<240||minuteET(t)>=1200||
+        ![o,h,l,c].every(pos)||h<Math.max(o,c,l)||l>Math.min(o,c,h))return null;
+      return {t,at,o,h,l,c};
+    }
+    minute(b) {
+      const k=Math.floor(b.t/60000)*60000,old=this.minutes.get(k);
+      if(old?.full&&old.full.at>b.at)return false;
+      this.minutes.set(k,{full:{...b,t:k},seconds:new Map()});return true;
+    }
+    seed(rows,now) {
+      for(const r of rows||[]) {
+        const t=Number(r.t);if(t%60000!==0||t+59999>now)continue;
+        const b=this.bar(r,t,t+59999,now);if(b)this.minute(b);
+      }
+    }
+    event(x,now) {
+      if(!['A','AM'].includes(x.ev))return false;
+      const b=this.bar(x,x.s,x.e,now);if(!b)return false;
+      if(x.ev==='AM') {
+        if(b.t%60000!==0||b.at<b.t+59999||b.at>b.t+60000||b.at>now)return false;
+        return this.minute({...b,at:b.t+59999});
+      }
+      if(b.at-b.t>1000)return false;
+      const k=Math.floor(b.t/60000)*60000,second=Math.floor(b.t/1000)*1000;
+      let entry=this.minutes.get(k);
+      if(entry?.full)return false;
+      if(!entry){entry={full:null,seconds:new Map()};this.minutes.set(k,entry);}
+      if(entry.seconds.get(second)?.at>b.at)return false;
+      entry.seconds.set(second,b);return true;
+    }
+    values(now=Date.now()) {
+      const groups=new Map();
+      for(const [t,entry] of [...this.minutes].sort((a,b)=>a[0]-b[0])) {
+        const samples=entry.full?[entry.full]:[...entry.seconds.values()].sort((a,b)=>a.t-b.t);
+        if(!samples.length)continue;
+        const m={t,o:samples[0].o,h:Math.max(...samples.map(x=>x.h)),l:Math.min(...samples.map(x=>x.l)),
+          c:samples.at(-1).c,at:samples.at(-1).at,full:!!entry.full};
+        const k=Math.floor(t/300000)*300000;if(!groups.has(k))groups.set(k,[]);groups.get(k).push(m);
+      }
+      return [...groups].map(([t,ms])=>({t,end:t+300000,
+        // A newly opened mid-minute stream cannot certify that minute's opening trade.
+        o:ms[0].full?ms[0].o:null,h:Math.max(...ms.map(x=>x.h)),l:Math.min(...ms.map(x=>x.l)),
+        c:ms.at(-1).c,at:ms.at(-1).at,partial:ms.some(x=>!x.full),
+        complete:t+300000<=now&&ms.every(x=>x.full)}));
+    }
+  }
   function transport({enabled,authenticated,lastReceivedAt,socketFailure},now) {
     if(!enabled)return '已暫停';
     if(socketFailure||!authenticated)return '快照模式 · 每分鐘查詢快照';
@@ -189,5 +242,5 @@
     if (price>=p.zone?.[0] && price<=p.zone?.[1]) return '在承接區；仍需收市確認';
     return `距突破 ${((p.bo/price-1)*100).toFixed(2)}%`;
   }
-  return {Book,Minutes,day,minuteET,timestamp,displayed,transport,classifyStatus,splitFactors,layer,rankings,card};
+  return {Book,Minutes,FiveMinutes,day,minuteET,timestamp,displayed,transport,classifyStatus,splitFactors,layer,rankings,card};
 });
