@@ -76,7 +76,7 @@
       for (const x of rows) {
         if (!this.symbols.has(x.ticker)) continue;
         const r = this.row(x.ticker);
-        if (pos(x.prevDay?.c)) r.previousClose = Number(x.prevDay.c);
+        if (pos(x.prevDay?.c)) {r.previousClose = Number(x.prevDay.c);r.previousCloseSession=day(now);}
         // min.c follows aggregate eligibility rules, unlike an arbitrary last trade.
         if (pos(x.min?.c)) this.price(x.ticker,x.min.c,x.min.t,now,'分鐘快照');
         if(x.lastTrade)this.trade(x.ticker,x.lastTrade.p,x.lastTrade.t,now,x.lastTrade.q,x.lastTrade.c);

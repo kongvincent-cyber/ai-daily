@@ -333,6 +333,18 @@
     const rows=[...state.book.rows.values()],fresh=rows.filter(r=>r.priceAt&&now-r.priceAt<120000&&C.day(r.priceAt)===C.day(now)).length;
     feedEl.textContent=`${rows.filter(r=>C.displayed(r)?.price).length}/${state.book.symbols.size} 價格 · ${C.transport(state,now)}${state.lastReceivedAt?' · 最後收數 '+clock(state.lastReceivedAt):''} · ${active?fresh+' 個近兩分鐘有合資格成交':'顯示最後可用行情'} · 每秒自動更新畫面，毋須手動刷新`;
     const historical=typeof D!=='undefined'&&D&&D.date!==state.latest.date;
+    const hk=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Hong_Kong',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
+    document.getElementById('session-clock').textContent=`香港日期 ${hk} · 美東日期 ${C.day(now)} · ${session} · 最新收市資料 ${state.latest.date}（收市歷史不等於今日盤中）`;
+    document.getElementById('benchmark-label').textContent=historical?'SPY / QQQ · 收市歷史 '+D.date:'SPY / QQQ · 今日行情 '+C.day(now);
+    document.querySelectorAll('[data-benchmark]').forEach(el=>{
+      const t=el.dataset.benchmark,row=state.book.rows.get(t),p=C.displayed(row);
+      const current=p?.price&&C.day(p.priceAt)===C.day(now);
+      const change=historical?(t==='SPY'?D.spy.chg:D.qqq):(current&&row.previousClose>0&&row.previousCloseSession===C.day(now)?(p.price/row.previousClose-1)*100:null);
+      const value=el.querySelector('[data-benchmark-return]');
+      value.textContent=change==null?'—':pct(change);value.className='val '+(change>0?'pos':change<0?'neg':'neu');
+      el.querySelector('[data-benchmark-price]').textContent=historical?'':p?.price?money(p.price):'等候報價';
+      el.querySelector('[data-benchmark-status]').textContent=historical?'歷史收市升跌；不混入今日行情':`${C.transport(state,now)} · ${p?.price?clock(p.priceAt):'尚無報價'}${!current||now-p?.priceAt>120000?' · 最後價／非新成交':''} · ${change==null?'升跌基準待核實':'對比上一交易日收市'}`;
+    });
     const benchmarks=cardEl.querySelector('[data-live-benchmarks]');
     benchmarks.textContent=['SPY','QQQ','SOXX'].map(t=>{const row=state.book.rows.get(t),p=C.displayed(row);return t+' '+(p?.price?money(p.price)+(row.previousClose&&C.day(p.priceAt)===C.day(now)?' '+pct((p.price/row.previousClose-1)*100):'')+' · '+clock(p.priceAt)+(now-p.priceAt>120000?' · 最後價':''):'等候報價');}).join(' ｜ ');
     document.querySelectorAll('[data-live-symbol]').forEach(el=>{
