@@ -77,6 +77,8 @@
         if (!this.symbols.has(x.ticker)) continue;
         const r = this.row(x.ticker);
         if (pos(x.prevDay?.c)) {r.previousClose = Number(x.prevDay.c);r.previousCloseSession=day(now);}
+        if (pos(x.prevDay?.v)) {r.previousVolume=Number(x.prevDay.v);r.previousVolumeSession=day(now);}
+        this.sessionData(x.ticker,x.day?.o,x.min?.av??x.day?.v,x.min?.t,now);
         // min.c follows aggregate eligibility rules, unlike an arbitrary last trade.
         if (pos(x.min?.c)) this.price(x.ticker,x.min.c,x.min.t,now,'分鐘快照');
         if(x.lastTrade)this.trade(x.ticker,x.lastTrade.p,x.lastTrade.t,now,x.lastTrade.q,x.lastTrade.c);
@@ -84,10 +86,22 @@
       }
     }
     event(x,now) {
-      if (x.ev === 'A') return this.price(x.sym,x.c,x.e,now,'秒級成交');
+      if (x.ev === 'A') {
+        this.sessionData(x.sym,x.op,x.av,x.e,now);
+        return this.price(x.sym,x.c,x.e,now,'秒級成交');
+      }
       if (x.ev === 'Q') return this.quote(x.sym,x.bp,x.ap,x.t,now,x.q);
       if (x.ev === 'T') return this.trade(x.sym,x.p,x.t,now,x.q,x.c);
       return false;
+    }
+    sessionData(t,open,volume,ts,now) {
+      ts=timestamp(ts,now);
+      if(!this.symbols.has(t)||ts===null||day(ts)!==day(now))return;
+      const r=this.row(t);
+      if(pos(open)&&minuteET(ts)>=570&&(!r.openAt||ts>=r.openAt))
+        Object.assign(r,{officialOpen:Number(open),openAt:ts,openSession:day(ts)});
+      if(volume!=null&&Number.isFinite(Number(volume))&&Number(volume)>=0&&(!r.volumeAt||ts>=r.volumeAt))
+        Object.assign(r,{volume:Number(volume),volumeAt:ts,volumeSession:day(ts)});
     }
   }
   // Raw last prints are displayed separately; they never rewrite eligible index prices.
@@ -233,6 +247,30 @@
     return {ready:true,groups,rows,total:Object.values(baseline.layers).reduce((s,g)=>s+g.members.length,0),
       top:rows.filter(x=>x.c>0).slice(0,5),bottom:[...rows].reverse().filter(x=>x.c<0).slice(0,5)};
   }
+  // Same cohorts and formulas as daily_pdf.py, but current eligible prices.
+  // Missing inputs never become zero / unchanged prices. Final daily signals remain separate.
+  function metrics(packet,book,now) {
+    const session=day(now),members=Object.entries(packet.members||{}).flatMap(([g,ms])=>ms.map(m=>({t:m.t,g}))),rows=[];
+    const median=xs=>{const a=[...xs].sort((a,b)=>a-b),n=a.length;return n?(a[Math.floor((n-1)/2)]+a[Math.floor(n/2)])/2:null;};
+    for(const m of members) {
+      const r=book.rows.get(m.t);
+      if(!pos(r?.price)||day(r.priceAt)!==session||!pos(r.previousClose)||r.previousCloseSession!==session)continue;
+      rows.push({...m,c:100*(r.price/r.previousClose-1),at:r.priceAt,old:now-r.priceAt>120000,
+        gap:r.openSession===session?100*(r.officialOpen/r.previousClose-1):null,
+        o2n:r.openSession===session?100*(r.price/r.officialOpen-1):null,
+        volumeReady:r.volumeSession===session&&r.previousVolumeSession===session&&pos(r.previousVolume),
+        volume:r.volume,previousVolume:r.previousVolume,volumeAt:r.volumeAt});
+    }
+    const total=members.length,ready=total>0&&rows.length===total;
+    const cap=rows.filter(x=>['L1','L2','L3','Q','SP','M'].includes(x.g)),sw=rows.filter(x=>['L4','L5','L6'].includes(x.g));
+    const opened=rows.filter(x=>x.gap!==null),gaps=opened.filter(x=>x.gap>5),vols=rows.filter(x=>x.volumeReady);
+    const themes=(packet.tags||[]).map(t=>{const rs=rows.filter(x=>t.members.includes(x.t));return {covered:rs.length,total:t.members.length,ready:rs.length===t.members.length&&rs.length>0,med:median(rs.map(x=>x.c)),up:rs.length?100*rs.filter(x=>x.c>0).length/rs.length:null,old:rs.filter(x=>x.old).length};});
+    return {session,ready,total,covered:rows.length,rows,old:rows.filter(x=>x.old).length,at:rows.length?Math.max(...rows.map(x=>x.at)):null,
+      capdiff:ready&&cap.length&&sw.length?median(cap.map(x=>x.c))-median(sw.map(x=>x.c)):null,
+      adv:ready?100*rows.filter(x=>x.c>0).length/total:null,
+      gap:{ready:ready&&opened.length===total,covered:opened.length,n:gaps.length,win:gaps.length?100*gaps.filter(x=>x.o2n>0).length/gaps.length:null,med:median(gaps.map(x=>x.o2n))},
+      bursts:{ready:ready&&vols.length===total,covered:vols.length,up:vols.filter(x=>x.c>=4&&x.volume>x.previousVolume).length,down:vols.filter(x=>x.c<=-4&&x.volume>x.previousVolume).length,old:vols.filter(x=>now-x.volumeAt>120000).length},themes};
+  }
   function card(p,price,split) {
     if (!pos(price)) return '等候成交';
     if (split && split!==1) return '拆股後需核對原卡價位';
@@ -242,5 +280,6 @@
     if (price>=p.zone?.[0] && price<=p.zone?.[1]) return '在承接區；仍需收市確認';
     return `距突破 ${((p.bo/price-1)*100).toFixed(2)}%`;
   }
-  return {Book,Minutes,FiveMinutes,day,minuteET,timestamp,displayed,transport,classifyStatus,splitFactors,layer,rankings,card};
+  return {Book,Minutes,FiveMinutes,day,minuteET,timestamp,displayed,transport,classifyStatus,splitFactors,layer,rankings,metrics,card};
 });
+

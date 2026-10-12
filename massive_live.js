@@ -7,7 +7,7 @@
     phase:'未連接',detail:'',dataDetail:'',socketFailure:null,latest:null,quotes:[],charts:new Map(),controllers:new Set(),owner:crypto.randomUUID(),enabled:false};
   let cardEl,feedEl,tableEl,layerEl,statusEl,keyEl,rememberEl,leaseRelease,leaseTimer,leaseFallback=false;
   let reconnectTimer,handshakeTimer,stableTimer,refreshTimer,paintTimer,started=false,lastPacketDate='';
-  let rankingView='live';
+  let rankingView='live',statsView='live',refreshGeneration=null,watchdogTimer;
   const money=x=>Number.isFinite(x)?'$'+x.toFixed(x<1?4:2):'—';
   const pct=x=>(x>0?'+':'')+x.toFixed(2)+'%';
   const clock=t=>new Date(t).toLocaleString('zh-HK',{timeZone:'Asia/Hong_Kong',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false})+' 香港';
@@ -36,27 +36,41 @@
       const r=await fetch(url,{headers:{Authorization:'Bearer '+state.key},cache:'no-store',credentials:'omit',referrerPolicy:'no-referrer',signal:ac.signal});
       if(generation!==state.generation)throw Error('Cancelled');
       if(!r.ok)throw Error(r.status===401||r.status===403?'Authorization':r.status===429?'Rate limit':'Network');
-      const j=await r.json();if(j.status==='ERROR'||j.status==='NOT_AUTHORIZED')throw Error('Authorization');return j;
+      const j=await r.json();if(generation!==state.generation)throw Error('Cancelled');
+      if(j.status==='NOT_AUTHORIZED')throw Error('Authorization');if(j.status==='ERROR')throw Error('Provider error');return j;
     } finally {clearTimeout(timer);state.controllers.delete(ac);}
   }
-  async function loadBaseline() {
-    try {const b=await fetchEnc('live_baseline.enc');
+  async function loadBaseline(g=state.generation) {
+    const ac=new AbortController();state.controllers.add(ac);const timer=setTimeout(()=>ac.abort(),10000);
+    try {const r=await fetch('live_baseline.enc?t='+Date.now(),{cache:'no-store',signal:ac.signal});
+      if(!r.ok)throw Error('Baseline');const b=await dec(await r.arrayBuffer());
+      if(g!==state.generation)return;
       if(b.schema!==1||!b.asof||Object.keys(b.closes||{}).length!==255)throw Error('Baseline');
       state.baseline=b;
-    } catch (_) {state.baseline=null;}
+    } catch (_) { /* Retain dated baseline; its session checks still apply. */ }
+    finally {clearTimeout(timer);state.controllers.delete(ac);}
   }
   async function refresh(g) {
-    if(!state.key||g!==state.generation)return;
+    if(!state.key||g!==state.generation||refreshGeneration===g)return;
+    refreshGeneration=g;
     const ts=symbols();let warnings=[];
+    const apply=(index,value)=>{
+      if(g!==state.generation)return value;
+      if(index===0)state.market=value;
+      if(index===1&&Array.isArray(value.tickers)) {
+        state.book.snapshot(value.tickers,Date.now());state.snapshotCount=value.tickers.filter(x=>ts.includes(x.ticker)).length;
+        state.lastSnapshotAt=Date.now();
+      }
+      paint();return value;
+    };
     const calls=await Promise.allSettled([
-      api('/v1/marketstatus/now',g),
-      api('/v2/snapshot/locale/us/markets/stocks/tickers?include_otc=false&tickers='+encodeURIComponent(ts.join(',')),g),
-      loadBaseline()
+      api('/v1/marketstatus/now',g).then(x=>apply(0,x)),
+      api('/v2/snapshot/locale/us/markets/stocks/tickers?include_otc=false&tickers='+encodeURIComponent(ts.join(',')),g).then(x=>apply(1,x)),
+      loadBaseline(g)
     ]);
     if(g!==state.generation)return;
-    for(const r of calls)if(r.status==='rejected'&&r.reason.message==='Authorization') {
-      state.enabled=false;stop('驗證未通過','請核對 Massive API key、Stocks Advanced 權限及交易所協議。');return;
-    }
+    // REST endpoint refusal must not kill an independently authenticated stream.
+    if(calls[1].status==='rejected'&&calls[1].reason.message==='Authorization')warnings.push('快照驗證未通過；請核對 key／權限，串流獨立運作');
     if(calls[0].status==='fulfilled')state.market=calls[0].value;else {state.market=null;warnings.push('市場狀態未核實');}
     if(calls[1].status==='fulfilled'&&Array.isArray(calls[1].value.tickers)) {
       state.book.snapshot(calls[1].value.tickers,Date.now());state.snapshotCount=calls[1].value.tickers.filter(x=>ts.includes(x.ticker)).length;
@@ -73,7 +87,7 @@
       }
     } catch(_) {warnings.push('拆股基準未核實；盤中指數暫停');}
     if(g!==state.generation)return;
-    state.dataDetail=warnings.join(' · ');paint();
+    state.dataDetail=warnings.join(' · ');refreshGeneration=null;paint();
   }
   function closeSocket() {
     clearTimeout(reconnectTimer);clearTimeout(handshakeTimer);clearTimeout(stableTimer);
@@ -81,7 +95,7 @@
     if(old){old.onclose=null;old.onmessage=null;old.onerror=null;old.close();}
   }
   function clearTransport() {
-    closeSocket();clearInterval(refreshTimer);
+    closeSocket();clearInterval(refreshTimer);clearInterval(watchdogTimer);refreshGeneration=null;
     for(const ac of state.controllers)ac.abort();state.controllers.clear();
   }
   function socketFallback(phase,detail) {
@@ -152,10 +166,10 @@
             socketFallback(phases[failure.kind],`Massive [${failure.code}]${failure.reason?' '+failure.reason:''} · ${hints[failure.kind]}`);return;
           }
           if(x.status==='auth_success') {
-            clearTimeout(handshakeTimer);state.authenticated=true;state.socketFailure=null;
+            clearTimeout(handshakeTimer);state.authenticated=true;state.socketFailure=null;state.connectedAt=Date.now();
             ws.send(JSON.stringify({action:'subscribe',params:symbols().map(t=>'A.'+t).join(',')}));
             updateQuotes();message('已連線 · 等候行情');
-            stableTimer=setTimeout(()=>{if(state.ws===ws)state.failures=0;},60000);
+            stableTimer=setTimeout(()=>{if(state.ws===ws&&state.lastReceivedAt)state.failures=0;},60000);
           }
         }else if(state.authenticated) {
           const now=Date.now(),priceAccepted=state.book.event(x,now);
@@ -168,7 +182,10 @@
     ws.onclose=()=>{
       if(g!==state.generation||state.ws!==ws)return;
       clearTimeout(handshakeTimer);clearTimeout(stableTimer);state.ws=null;state.authenticated=false;
-      if(++state.failures>5){socketFallback('串流重連已暫停','已試 5 次；價格快照繼續每分鐘更新，按「重新連線」再試。');return;}
+      if(++state.failures>5){
+        message('網絡重連冷卻中','價格快照繼續更新；5 分鐘後自動再試。');
+        reconnectTimer=setTimeout(()=>{if(g===state.generation){state.failures=0;connectSocket(g);}},300000);return;
+      }
       // Massive may take 10–30 seconds to release a dropped account slot.
       const delay=30000+Math.floor(Math.random()*500);
       message('斷線 · 自動重連 '+state.failures+'/5');
@@ -176,11 +193,19 @@
     };
   }
   async function start(resetSocket=false) {
-    if(!state.key||document.hidden)return;
+    if(!state.key)return;
     state.enabled=true;
+    if(document.hidden){message('背景暫停','返回 App 後自動重新連線。');return;}
     if(resetSocket)state.socketFailure=null;
     stop('準備實時連線');const g=state.generation;
     refresh(g);refreshTimer=setInterval(()=>refresh(g),60000);
+    watchdogTimer=setInterval(()=>{
+      if(g!==state.generation||document.hidden||!state.enabled||!state.authenticated||state.socketFailure)return;
+      const active=state.market&&(state.market.market==='open'||state.market.earlyHours||state.market.afterHours);
+      if(active&&state.lastSnapshotAt&&Date.now()-state.lastSnapshotAt<120000&&Date.now()-(state.lastReceivedAt||state.connectedAt)>120000) {
+        state.detail='串流停滯；保留快照並自動重連';state.ws?.close();
+      }
+    },15000);
     if(state.socketFailure){message(state.socketFailure.phase,state.socketFailure.detail);return;}
     if(!await acquireLease(g)){if(g===state.generation)message('另一分頁使用實時連線','呢個分頁每分鐘查詢價格快照。');return;}
     if(g!==state.generation){releaseLease();return;}
@@ -188,7 +213,7 @@
   }
   function priceLine(t,now) {
     const r=C.displayed(state.book?.rows.get(t));
-    if(!r?.price)return '等候報價';
+    if(!r?.price)return !state.key?'未連接：請在上方輸入本機 Massive key':!state.enabled?'已暫停：按重新連線':`等候報價 · ${state.phase}${state.dataDetail?' · '+state.dataDetail:''}`;
     const base=state.baseline?.closes?.[t],factor=state.factors?.[t];
     const change=base&&factor?` · ${pct((r.price/(base*factor)-1)*100)} vs ${state.baseline.asof} 收市`:'';
     const age=now-r.priceAt;
@@ -321,6 +346,47 @@
       } else tb.innerHTML=D.top.map(x=>tagHtml(x,'pos')).join('')+D.bot.map(x=>tagHtml(x,'neg')).join('');
     }
   }
+  function paintMetrics(now,historical) {
+    const live=!historical&&statsView==='live',m=C.metrics(state.latest,state.book,now);
+    const mode=C.transport(state,now),gap=m.gap,bursts=m.bursts;
+    document.getElementById('closing-label').textContent=live?'今日市場統計 · '+m.session+' · 盤中暫算':'收市分析 · '+D.date+'（已完成交易日）';
+    const toggle=document.getElementById('stats-view');toggle.hidden=historical;toggle.textContent=live?'顯示收市分析':'返回今日盤中';
+    document.getElementById('stats-status').textContent=live?`${mode} · 今日有效行情 ${m.covered}/${m.total}${m.at?' · 最新成員成交 '+clock(m.at):''}${m.old?' · '+m.old+' 隻超過兩分鐘未成交':''} · 合資格成交價對比上日收市；未作收市確認`:'歷史統計，不混入今日行情。';
+    const missing=`等候全部成員今日報價 ${m.covered}/${m.total}`;
+    const values=live?[
+      ['Capex − Software',m.capdiff==null?'—':m.capdiff.toFixed(2)+' pp',m.capdiff,m.ready?'兩組成員升跌幅中位數之差':missing],
+      ['Advancers (of '+m.total+')',m.adv==null?'—':m.adv.toFixed(1)+'%',m.adv==null?null:m.adv-50,m.ready?'最新價高於前收比例':missing],
+      ['Gap >5% · 開市→現在',gap.ready?(gap.n?gap.win.toFixed(1)+'% ('+gap.n+' names)':'無 >5% 高開'):'—',gap.ready?gap.win-50:null,gap.ready?'目前高於開市價比例；未確認收市勝率':'開市／報價資料 '+gap.covered+'/'+m.total+'；盤前不計'],
+      ['4% bursts · 盤中暫算',bursts.ready?bursts.up+'↑ / '+bursts.down+'↓':'—',bursts.ready?bursts.up-bursts.down:null,bursts.ready?'±4% 且今日累積量 > 上日全日量；未作收市確認'+(bursts.old?' · '+bursts.old+' 隻量資料超過兩分鐘':''):'價量資料 '+bursts.covered+'/'+m.total]
+    ]:[
+      ['Capex − Software',fp(D.bloc.cap-D.bloc.sw)+'pp',D.bloc.cap-D.bloc.sw,'收市 '+D.date],
+      ['Advancers (of '+(D.usize||255)+')',D.stats.up+'%',D.stats.up-50,'收市 '+D.date],
+      ['Gap win rate (>5% gap-ups)',D.gapmon.n?D.gapmon.win+'% ('+D.gapmon.n+' names)':'none',D.gapmon.win-50,'收市 '+D.date],
+      ['4% bursts (Pradeep)',D.up4+'↑ / '+D.dn4+'↓',D.up4-D.dn4,'收市 '+D.date]
+    ];
+    const explanations=[
+      '硬件 L1+L2+L3+Q+SP+M 成員升跌中位數，減軟件 L4+L5+L6 成員升跌中位數。單位為百分點，唔係兩組指數之差。',
+      '原有股票池中，今日合資格最新成交價高於上個交易日收市價嘅比例。缺資料唔會當作零升跌。',
+      '只計正式開市價較前收高 >5% 嘅成員。勝率暫算＝最新合資格成交價高於開市價嘅比例，唔係最終收市勝率。',
+      '沿用原公式：升跌 ≥+4%／≤−4%，而且今日累積成交量大於上日全日量。盤中數字會增減；唔用推算全日量，唔當成已確認收市訊號。'
+    ];
+    document.querySelectorAll('[data-stat]').forEach(el=>{
+      const i=Number(el.dataset.stat),[label,value,sign,detail]=values[i];
+      el.querySelector('[data-stat-label]').textContent=label+' ⓘ';
+      const v=el.querySelector('[data-stat-value]');v.textContent=value;v.className='val '+(sign>0?'pos':sign<0?'neg':'neu');
+      el.querySelector('[data-stat-status]').textContent=detail;
+      el.onclick=live?()=>panel('<b>'+label+' · '+m.session+' · 盤中暫算</b><div style="margin:8px 0">'+value+'</div><div class="lab">'+explanations[i]+'</div><div class="lab" style="margin-top:8px">收市歷史請使用「顯示收市分析」。</div>'):[showCapSw,showAdv,showGap,showBurst][i];
+    });
+    document.querySelectorAll('[data-theme]').forEach(el=>{
+      const i=Number(el.dataset.theme),x=live?m.themes[i]:D.tags[i],ready=live?x?.ready:true,v=el.querySelector('[data-theme-value]');
+      v.textContent=ready?pct(x.med)+' median · advancers '+Number(x.up).toFixed(1)+'%':'— 等候成員行情';v.className='val '+(ready?cls(x.med):'neu');
+      el.querySelector('[data-theme-status]').textContent=live?`今日 ${m.session} · ${x?.covered||0}/${x?.total||0} · ${mode}${x?.old?' · '+x.old+' 隻超過兩分鐘未成交':''} · 展開圖表保留收市歷史`:'收市 '+D.date;
+    });
+    const gapEl=document.getElementById('gap');
+    gapEl.textContent=live?(gap.ready?(gap.n?`${gap.n} 隻高開 >5% · 開市→現在中位 ${pct(gap.med)} · 暫算勝率 ${gap.win.toFixed(1)}%`:'今日暫無 >5% 高開'):`今日開市／行情資料 ${gap.covered}/${m.total} · 未齊，不沿用昨日勝率`)+(m.old?' · 包含超過兩分鐘嘅最後成交':'')+' · '+mode:
+      D.gapmon.n?`${D.gapmon.n} names gapped up >5% | open→close median ${pct(D.gapmon.med)} | win rate ${D.gapmon.win}% · 收市 ${D.date}`:'No >5% gap-ups · 收市 '+D.date;
+    gapEl.onclick=live?()=>document.querySelector('[data-stat="2"]').click():showGap;
+  }
   function paint() {
     if(!started||!state.latest)return;
     const now=Date.now(),market=state.market;
@@ -376,7 +442,7 @@
       }
       if(!state.baseline)layerEl.append(node('div','收市基準未載入；實時價仍可使用。','lab'));
     }
-    paintRankings();paintDetail(now,historical);
+    paintMetrics(now,historical);paintRankings();paintDetail(now,historical);
     if(cardEl.querySelector('[data-price-details]').open) {
       tableEl.replaceChildren();const search=cardEl.querySelector('[data-live-search]').value.trim().toUpperCase();
       for(const t of symbols().filter(t=>!search||t.includes(search)||(state.latest.names?.[t]||'').toUpperCase().includes(search)).sort()) {
@@ -393,7 +459,8 @@
     if(!packet||packet.date<lastPacketDate)return;
     if(lastPacketDate===packet.date){paint();return;}
     lastPacketDate=packet.date;state.latest=packet;
-    state.book=new C.Book(symbols());
+    const previous=state.book;state.book=new C.Book(symbols());
+    for(const [t,r] of previous?.rows||[])if(state.book.symbols.has(t))state.book.rows.set(t,r);
     if(started&&state.key&&state.enabled)await start();
   }
   async function mount() {
@@ -433,9 +500,10 @@
     const search=node('input');search.type='search';search.placeholder='Search ticker or name';search.dataset.liveSearch='';search.setAttribute('aria-label','搜尋實時股票');search.oninput=paint;tableEl=node('div');pd.append(search,tableEl);pd.ontoggle=paint;cardEl.append(pd);
     document.getElementById('sub').after(cardEl);
     paintTimer=setInterval(paint,1000);state.key=await restoreKey();setup.open=!state.key;
-    if(state.key)await start();else {await loadBaseline();paint();}
+    if(state.key)await start();else {message('未連接','呢部裝置未載入 Massive key；請在下方連接，唔使重新訂閱。');await loadBaseline();paint();}
   }
   window.MassiveLive={packetChanged:packet=>{mount().then(()=>packetChanged(packet));},paint,stop,paintRankings,
+    toggleStats:()=>{statsView=statsView==='live'?'close':'live';paint();},
     toggleRankings:()=>{rankingView=rankingView==='live'?'close':'live';paintRankings();}};
   document.addEventListener('visibilitychange',()=>{if(document.hidden&&state.enabled)stop('背景暫停','返回 App 後自動重新連線。');else if(!document.hidden&&state.key&&state.enabled)start();});
   window.addEventListener('pagehide',()=>stop('已暫停'));
@@ -444,3 +512,4 @@
   window.addEventListener('online',()=>{if(state.key&&state.enabled)start();});
   const probe=setInterval(()=>{if(typeof D!=='undefined'&&D&&typeof KEY!=='undefined'&&KEY){clearInterval(probe);mount();}},500);
 })();
+

@@ -67,6 +67,8 @@ button{background:#1b2230;color:#aeb7c9;border:1px solid #2a3448;border-radius:8
 <h2 id="benchmark-label">SPY / QQQ · 行情</h2>
 <div class="kpi" id="benchmark-kpi"></div>
 <h2 id="closing-label">收市分析</h2>
+<button id="stats-view" onclick="window.MassiveLive?.toggleStats()">顯示收市分析</button>
+<div id="stats-status" class="lab" style="margin:6px 0"></div>
 <div class="kpi" id="kpi"></div>
 <div id="ttags"></div>
 <div class="card"><h2 id="group-title" style="margin:0">Group strength</h2><div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0"><button id="sbtn" onclick="tg(event)">Sort: median %</button><button id="ranking-view" onclick="window.MassiveLive?.toggleRankings()">顯示收市分析</button></div><div id="group-status" class="lab"></div><div id="grows"></div></div>
@@ -221,11 +223,11 @@ function render(){
   ["Advancers (of "+(D.usize||255)+")",D.stats.up+"%",D.stats.up>=50?"pos":"neg","showAdv"],
   ["Gap win rate (>5% gap-ups)",D.gapmon.n?D.gapmon.win+"% ("+D.gapmon.n+" names)":"none",D.gapmon.n&&D.gapmon.win<30?"neg":"neu","showGap"],
   ["4% bursts (Pradeep)",(D.up4!==undefined?`${D.up4}↑ / ${D.dn4}↓`:"tap"),(D.up4!==undefined&&D.up4>=D.dn4)?"pos":"neg","showBurst"]
- ].map(([l,v,c,f])=>`<div class="card" style="cursor:pointer" onclick="${f}()"><div class="lab">${l} <span style="color:#5c6577">ⓘ</span></div><div class="val ${c}">${v}</div></div>`).join("");
+ ].map(([l,v,c,f],i)=>`<div class="card" data-stat="${i}" style="cursor:pointer" onclick="${f}()"><div class="lab" data-stat-label>${l} <span style="color:#5c6577">ⓘ</span></div><div class="val ${c}" data-stat-value>${v}</div><div class="lab" data-stat-status></div></div>`).join("");
  document.getElementById("ttags").innerHTML=(D.tags&&D.tags.length)?D.tags.map((tg,i)=>
-  `<div class="card" style="margin:8px 0;cursor:pointer" onclick="tgTag(${i})">
+  `<div class="card" data-theme="${i}" style="margin:8px 0;cursor:pointer" onclick="tgTag(${i})">
     <div class="lab">⊕ Theme tag · ${tg.en} <span style="color:#5c6577">(${tg.n} names, cross-layer) — tap for members</span></div>
-    <div class="val ${cls(tg.med)}" style="font-size:15px">${fp(tg.med)} <span style="font-size:11px;color:#aeb7c9;font-weight:400">median · advancers ${tg.up}%</span></div>
+    <div data-theme-value class="val ${cls(tg.med)}" style="font-size:15px">${fp(tg.med)} <span style="font-size:11px;color:#aeb7c9;font-weight:400">median · advancers ${tg.up}%</span></div><div class="lab" data-theme-status></div>
     <div id="tagx${i}" style="display:none;margin-top:6px">
       <div class="lab" style="margin-bottom:4px">${tg.k==="CTRL"?"Agent control + cost observability + token/gateway middleware + data governance — one cross-layer control-plane cohort.":"Merchant co-packaged optics / AI optical interconnect chain (excl. AVGO/NVDA/TSM to keep the signal pure)."} Layers untouched — overlay lens. Chart: cohort vs Capex vs Software blocs, YTD.</div>
       <div id="tagc${i}" style="margin-top:2px"></div>
@@ -554,6 +556,7 @@ tryCache();
 })();
 
 </script>
-<script defer src="massive_live_core.js?v=20261007-benchmarks1"></script>
-<script defer src="massive_live.js?v=20261007-benchmarks1"></script>
+<script defer src="massive_live_core.js?v=20261012-recovery-metrics1"></script>
+<script defer src="massive_live.js?v=20261012-recovery-metrics1"></script>
 </body></html>
+
