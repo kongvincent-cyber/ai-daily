@@ -254,18 +254,28 @@
     if(bars.length) {
       const selected=bars.find(b=>b.t===entry.selected)||bars.at(-1);
       const time=t=>new Date(t).toLocaleTimeString('en-GB',{timeZone:'Asia/Hong_Kong',hour:'2-digit',minute:'2-digit',hour12:false});
-      const heading=node('div','5 分鐘 OHLC · 香港時間','lab');heading.style.marginTop='8px';box.append(heading);
-      const W=536,H=236,left=10,right=66,top=14,bottom=30;
+      const heading=node('div','5 分鐘 OHLC + 成交量 · 香港時間','lab');heading.style.marginTop='8px';box.append(heading);
+      const W=536,H=334,left=10,right=66,top=14,bottom=30,priceBottom=206,volumeTop=242,volumeBottom=H-bottom;
+      const volumeFormat=new Intl.NumberFormat('en-US',{maximumFractionDigits:6});
+      const volumeText=b=>b.v==null?'—（成交量未提供）':volumeFormat.format(b.v)+' 股'+(b.partial?' · 暫計，待完整分鐘資料':!b.complete?' · 累積中':'');
+      const compactVolume=v=>v>=1e9?(v/1e9).toFixed(1)+'B':v>=1e6?(v/1e6).toFixed(1)+'M':v>=1e3?(v/1e3).toFixed(1)+'K':String(Math.round(v*100)/100);
       const lo=Math.min(...bars.map(b=>b.l)),hi=Math.max(...bars.map(b=>b.h)),margin=Math.max((hi-lo)*.06,.01),low=lo-margin,high=hi+margin;
       const start=bars[0].t,end=bars.at(-1).end,span=Math.max(300000,end-start);
-      const x=t=>left+(t-start)/span*(W-left-right),y=p=>top+(high-p)/(high-low)*(H-top-bottom);
+      const x=t=>left+(t-start)/span*(W-left-right),y=p=>top+(high-p)/(high-low)*(priceBottom-top);
       const tick=Math.min(3.5,(W-left-right)/(span/300000)*.3);
-      const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.setAttribute('aria-label','今日五分鐘 OHLC bar chart');svg.setAttribute('role','img');svg.style.cssText='width:100%;background:#10151f;border-radius:8px;margin-top:6px;cursor:crosshair';
+      const volumeMax=Math.max(1,...bars.filter(b=>b.v!=null).map(b=>b.v)),volumeWidth=Math.max(.6,Math.min(8,(W-left-right)/(span/300000)*.68));
+      const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.setAttribute('aria-label','今日五分鐘 OHLC 及成交量圖');svg.setAttribute('role','img');svg.style.cssText='width:100%;background:#10151f;border-radius:8px;margin-top:6px;cursor:crosshair';
       const add=(tag,attrs,text)=>{const el=document.createElementNS(svg.namespaceURI,tag);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,v);if(text!=null)el.textContent=text;svg.append(el);return el;};
       for(let i=0;i<4;i++) {
         const p=low+(high-low)*i/3,py=y(p);
         add('line',{x1:left,x2:W-right,y1:py,y2:py,stroke:'#283145','stroke-width':.6});
         add('text',{x:W-right+5,y:py+4,fill:'#9da7b9','font-size':12},money(p));
+      }
+      add('text',{x:left,y:volumeTop-10,fill:'#9da7b9','font-size':12},'成交量（股）');
+      for(const v of [0,volumeMax]) {
+        const vy=volumeBottom-v/volumeMax*(volumeBottom-volumeTop);
+        add('line',{x1:left,x2:W-right,y1:vy,y2:vy,stroke:'#283145','stroke-width':.6});
+        add('text',{x:W-right+5,y:vy+4,fill:'#9da7b9','font-size':12},compactVolume(v));
       }
       for(let i=0;i<4;i++) {
         const at=start+span*i/3;
@@ -276,15 +286,22 @@
       for(const b of bars) {
         const px=x(b.t+150000),color=b.o==null?'#83bae9':b.c>=b.o?'#4cc38a':'#ff7a6b';
         const d=`M${px},${y(b.h)}V${y(b.l)}`+(b.o==null?'':`M${px-tick},${y(b.o)}H${px}`)+`M${px},${y(b.c)}H${px+tick}`;
-        const path=add('path',{d,fill:'none',stroke:color,'stroke-width':b.t===selected.t?1.9:1.2,'data-ohlc':b.t,'data-open':b.o??'','data-high':b.h,'data-low':b.l,'data-close':b.c,'data-complete':b.complete});
-        const title=document.createElementNS(svg.namespaceURI,'title');title.textContent=`${time(b.t)}–${time(b.end)} 開 ${money(b.o)} 高 ${money(b.h)} 低 ${money(b.l)} 收 ${money(b.c)}`;path.append(title);
+        const path=add('path',{d,fill:'none',stroke:color,'stroke-width':b.t===selected.t?1.9:1.2,'data-ohlc':b.t,'data-center-x':px,'data-open':b.o??'','data-high':b.h,'data-low':b.l,'data-close':b.c,'data-complete':b.complete});
+        const title=document.createElementNS(svg.namespaceURI,'title');title.textContent=`${time(b.t)}–${time(b.end)} 開 ${money(b.o)} 高 ${money(b.h)} 低 ${money(b.l)} 收 ${money(b.c)} · 量 ${volumeText(b)}`;path.append(title);
+        if(b.v!=null) {
+          const height=b.v/volumeMax*(volumeBottom-volumeTop);
+          const rect=add('rect',{x:px-volumeWidth/2,y:volumeBottom-height,width:volumeWidth,height,fill:color,opacity:b.t===selected.t?1:.65,
+            'data-volume-bar':b.t,'data-volume':b.v,'data-volume-partial':b.partial||!b.complete});
+          const vt=document.createElementNS(svg.namespaceURI,'title');vt.textContent=`${time(b.t)}–${time(b.end)} · 成交量 ${volumeText(b)}`;rect.append(vt);
+        } else add('text',{x:px,y:volumeBottom-3,fill:'#9da7b9','font-size':10,'text-anchor':'middle','data-volume-missing':b.t},'—');
       }
       svg.onclick=e=>{
         const rect=svg.getBoundingClientRect(),px=(e.clientX-rect.left)*W/rect.width;
         entry.selected=bars.reduce((a,b)=>Math.abs(x(b.t+150000)-px)<Math.abs(x(a.t+150000)-px)?b:a).t;paint();
       };box.append(svg);
       const readout=node('div',`${time(selected.t)}–${time(selected.end)} · 開 ${money(selected.o)}　高 ${money(selected.h)}　低 ${money(selected.l)}　收 ${money(selected.c)}${selected.complete?' · 已完成':selected.end>now?' · 形成中':' · 待分鐘補齊'}${selected.o==null?' · 開價待完整分鐘資料':''}`,'lab');readout.dataset.barReadout='';box.append(readout);
-      const legend=node('div','左橫線＝開價；右橫線＝收價；直線＝高低 · 點選 bar 查看','lab');box.append(legend);
+      const volumeReadout=node('div','五分鐘成交量 '+volumeText(selected),'lab');volumeReadout.dataset.volumeReadout='';box.append(volumeReadout);
+      const legend=node('div','上圖：左開／右收／直線高低；下圖：同時段成交量 · 點選價或量查看','lab');box.append(legend);
       if(entry.selected!=null){const latest=node('button','返回最新一條');latest.type='button';latest.onclick=()=>{entry.selected=null;paint();};box.append(latest);}
       if(now-bars.at(-1).at>120000)box.append(node('div','最後有成交區間 '+time(bars.at(-1).t)+'–'+time(bars.at(-1).end)+' · 尚未有較新合資格彙總','lab'));
     }else box.append(node('div','今日五分鐘圖：等候 OHLC 行情／載入歷史','lab'));
@@ -512,4 +529,5 @@
   window.addEventListener('online',()=>{if(state.key&&state.enabled)start();});
   const probe=setInterval(()=>{if(typeof D!=='undefined'&&D&&typeof KEY!=='undefined'&&KEY){clearInterval(probe);mount();}},500);
 })();
+
 

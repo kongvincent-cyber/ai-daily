@@ -134,7 +134,12 @@
       const o=Number(x.o),h=Number(x.h),l=Number(x.l),c=Number(x.c);
       if(t===null||at===null||at<t||day(t)!==this.session||minuteET(t)<240||minuteET(t)>=1200||
         ![o,h,l,c].every(pos)||h<Math.max(o,c,l)||l>Math.min(o,c,h))return null;
-      return {t,at,o,h,l,c};
+      // v/dv is this interval's volume; av/dav is a cumulative daily total.
+      // Keep unknown distinct from genuine zero, and retain fractional shares.
+      const raw=x.dv??x.v;
+      const v=(typeof raw==='number'||typeof raw==='string'&&raw.trim()!=='')&&
+        Number.isFinite(Number(raw))&&Number(raw)>=0?Number(raw):null;
+      return {t,at,o,h,l,c,v};
     }
     minute(b) {
       const k=Math.floor(b.t/60000)*60000,old=this.minutes.get(k);
@@ -168,13 +173,15 @@
         const samples=entry.full?[entry.full]:[...entry.seconds.values()].sort((a,b)=>a.t-b.t);
         if(!samples.length)continue;
         const m={t,o:samples[0].o,h:Math.max(...samples.map(x=>x.h)),l:Math.min(...samples.map(x=>x.l)),
-          c:samples.at(-1).c,at:samples.at(-1).at,full:!!entry.full};
+          c:samples.at(-1).c,at:samples.at(-1).at,full:!!entry.full,
+          v:samples.every(x=>x.v!==null)?samples.reduce((sum,x)=>sum+x.v,0):null};
         const k=Math.floor(t/300000)*300000;if(!groups.has(k))groups.set(k,[]);groups.get(k).push(m);
       }
       return [...groups].map(([t,ms])=>({t,end:t+300000,
         // A newly opened mid-minute stream cannot certify that minute's opening trade.
         o:ms[0].full?ms[0].o:null,h:Math.max(...ms.map(x=>x.h)),l:Math.min(...ms.map(x=>x.l)),
         c:ms.at(-1).c,at:ms.at(-1).at,partial:ms.some(x=>!x.full),
+        v:ms.every(x=>x.v!==null)?ms.reduce((sum,x)=>sum+x.v,0):null,
         complete:t+300000<=now&&ms.every(x=>x.full)}));
     }
   }
@@ -282,4 +289,5 @@
   }
   return {Book,Minutes,FiveMinutes,day,minuteET,timestamp,displayed,transport,classifyStatus,splitFactors,layer,rankings,metrics,card};
 });
+
 
