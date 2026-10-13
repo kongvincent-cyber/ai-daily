@@ -97,3 +97,11 @@
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 @media(min-width:1100px){#workspace .lab{font-size:12px}#massive-live{font-size:13px}button{cursor:pointer}}
+
+@media(min-width:1100px){
+ .mem>.lb-tabs{flex:0 0 auto;align-self:flex-start;min-height:30px}
+ .mem>.lb-tabs button{min-width:62px}
+ .mem>div:not(.lb-tabs){flex-basis:100%;min-width:0;width:100%}
+ .mem>div:nth-child(2){display:flex;flex-wrap:wrap;gap:8px}
+ .mem>div:nth-child(2)>.mchip{max-width:100%}
+}

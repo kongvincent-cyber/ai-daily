@@ -335,8 +335,8 @@ async function showT(t){
   ${(D.wp&&D.wp[t])?`<div style="margin-top:8px;padding:8px;border:1px solid #2a3350;border-radius:8px"><div class="lab" style="margin-bottom:4px">⚑ Earnings watch — beyond EPS (next session)</div>${D.wp[t].map((w,i)=>`<div style="font-size:12.5px;line-height:1.5">${i+1}. ${w}</div>`).join("")}</div>`:``}
   <div id="tchart" style="margin-top:8px">${spark(sh,120,30)}<div class="lab">loading YTD chart…</div></div>`;
  const liveEl=document.createElement("div");liveEl.className="lab live-quote";liveEl.dataset.liveSymbol=t;d.querySelector("b").after(liveEl);
- if(window.MassiveLive)MassiveLive.paint();
  d.style.display="block";revealDetail(t);
+ if(window.MassiveLive)MassiveLive.paint();
  try{const chart=await fetchEnc("charts/"+t+".enc");if(d.querySelector('[data-live-symbol]')?.dataset.liveSymbol!==t)return;LASTC=chart;drawTickChart();}
  catch(e){const el=document.getElementById("tchart");if(el)el.innerHTML=spark(sh,120,30)+`<div class="lab">YTD chart unavailable · trend = last ${sh.length} daily % moves</div>`;}
 }
