@@ -515,7 +515,7 @@
     layerEl=node('div');ld.append(layerEl,node('div','沿用原來成員及等權日鏈，使用合資格彙總價。試算未寫入收市歷史，未觸發接棒、FTD 或派貨裁決。','lab'));ld.ontoggle=paint;cardEl.append(ld);
     const pd=node('details');pd.dataset.priceDetails='';pd.append(node('summary','全部股票／基準 · 價格及買賣盤'));
     const search=node('input');search.type='search';search.placeholder='Search ticker or name';search.dataset.liveSearch='';search.setAttribute('aria-label','搜尋實時股票');search.oninput=paint;tableEl=node('div');pd.append(search,tableEl);pd.ontoggle=paint;cardEl.append(pd);
-    document.getElementById('sub').after(cardEl);
+    document.getElementById('feed-slot').append(cardEl);
     paintTimer=setInterval(paint,1000);state.key=await restoreKey();setup.open=!state.key;
     if(state.key)await start();else {message('未連接','呢部裝置未載入 Massive key；請在下方連接，唔使重新訂閱。');await loadBaseline();paint();}
   }
@@ -529,5 +529,6 @@
   window.addEventListener('online',()=>{if(state.key&&state.enabled)start();});
   const probe=setInterval(()=>{if(typeof D!=='undefined'&&D&&typeof KEY!=='undefined'&&KEY){clearInterval(probe);mount();}},500);
 })();
+
 
 

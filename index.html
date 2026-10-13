@@ -50,32 +50,44 @@ button{background:#1b2230;color:#aeb7c9;border:1px solid #2a3448;border-radius:8
 #det{position:sticky;top:6px;z-index:5;box-shadow:0 6px 24px rgba(0,0,0,.5);display:none}
 #det .x{float:right;color:#8a93a6;cursor:pointer;padding:0 4px}
 .trend{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
-</style></head><body>
+</style><link rel="stylesheet" href="workspace.css?v=20261013-desktop1"></head><body>
 <div id="lock"><img src="icon-180.png" width="64" height="64" style="border-radius:14px">
 <div style="font-size:17px;font-weight:700">AI 6-Layer Daily</div>
 <input id="pw" type="password" placeholder="Enter passcode" autocomplete="current-password">
 <button onclick="unlock()">Unlock</button><div id="lockmsg"></div></div>
 <div id="app" style="display:none">
+<header id="app-header">
 <div id="auto-update-status" class="lab" role="status" style="margin-bottom:6px"></div>
-<h1><span>AI 6-Layer Daily</span><span style="display:flex;gap:6px;align-items:center"><span class="lab">收市歷史</span><select id="dsel" onchange="loadDay(this.value)"></select></span></h1>
+<h1><span>AI 6-Layer Daily <small class="desktop-only workspace-edition">Market workspace</small></span><span style="display:flex;gap:6px;align-items:center"><label class="lab" for="dsel">收市歷史</label><select id="dsel" onchange="loadDay(this.value)"></select></span></h1>
 <div class="sub" id="sub"></div>
 <div class="sub" id="session-clock"></div>
-<input id="q" type="search" placeholder="🔍 Search ticker or name (e.g. SNDK / Palantir)" style="width:100%;margin:4px 0" oninput="srch(this.value)">
-<div class="card" id="det"></div>
+</header>
+<nav id="workspace-nav" class="desktop-only" aria-label="Workspace sections">
+<a href="#benchmark-section">市場總覽</a><a href="#group-section">九層強弱</a><a href="#leaders-section">Top / Bottom</a><a href="#strike-section">出擊計劃</a><a href="#reports-slot">每日報告</a><a href="#history-section">歷史</a>
+<button id="workspace-focus" type="button" aria-pressed="false">放大圖表</button>
+</nav>
+<div id="workspace">
+<section id="feed-slot" aria-label="Massive live connection"></section>
+<section id="reports-slot" aria-label="Daily reports and audio"></section>
+<aside id="inspector" aria-label="Stock and analysis detail">
+<div class="desktop-only inspector-heading"><span>股票 / 分析</span><kbd>/</kbd></div>
+<label class="sr-only" for="q">Search ticker or company name</label>
+<input id="q" type="search" placeholder="🔍 Search ticker or name (e.g. SNDK / Palantir)" style="width:100%;margin:4px 0" oninput="srch(this.value)" autocomplete="off" aria-controls="workspace-search-results">
+<div id="workspace-search-results" class="desktop-only" aria-label="Matching stocks"></div>
+<div id="workspace-recent" class="desktop-only" aria-label="Recently viewed stocks"></div>
+<div id="inspector-empty" class="desktop-only card"><div class="inspector-icon">↗</div><h2>一邊睇市場，一邊睇個股</h2><p>點選左邊股票，或者搜尋代號，即可在這裏查看即時價格、五分鐘價量圖及日線均線。</p><div class="lab">按 / 搜尋 · Enter 開啟 · Esc 關閉詳情</div></div>
+<div class="card" id="det" aria-label="Selected stock or analysis"></div>
+</aside>
 <div class="chips" id="chips"></div>
-<div id="strike"></div>
-<h2 id="benchmark-label">SPY / QQQ · 行情</h2>
-<div class="kpi" id="benchmark-kpi"></div>
-<h2 id="closing-label">收市分析</h2>
-<button id="stats-view" onclick="window.MassiveLive?.toggleStats()">顯示收市分析</button>
-<div id="stats-status" class="lab" style="margin:6px 0"></div>
-<div class="kpi" id="kpi"></div>
-<div id="ttags"></div>
-<div class="card"><h2 id="group-title" style="margin:0">Group strength</h2><div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0"><button id="sbtn" onclick="tg(event)">Sort: median %</button><button id="ranking-view" onclick="window.MassiveLive?.toggleRankings()">顯示收市分析</button></div><div id="group-status" class="lab"></div><div id="grows"></div></div>
-<h2 id="top-title">Top 5 ↑ / Bottom 5 ↓</h2><div id="top-status" class="lab" style="margin-bottom:6px"></div><div class="tags" id="tb"></div>
-<h2>Gap monitor <span style="color:#5c6577;font-weight:400;font-size:11px">· tap for meaning</span></h2><div class="card" id="gap" style="font-size:13px;cursor:pointer" onclick="showGap()"></div>
-<h2>Earnings nodes</h2><div class="card earn" id="earn"></div>
-<h2>Recent track</h2><div class="trend" id="trend"></div><div class="hist" id="hist"></div>
+<section id="strike-section" aria-label="Daily strike plan"><div id="strike"></div></section>
+<section id="benchmark-section" aria-labelledby="benchmark-label"><h2 id="benchmark-label">SPY / QQQ · 行情</h2><div class="kpi" id="benchmark-kpi"></div></section>
+<section id="statistics-section" aria-labelledby="closing-label"><h2 id="closing-label">收市分析</h2><button id="stats-view" onclick="window.MassiveLive?.toggleStats()">顯示收市分析</button><div id="stats-status" class="lab" style="margin:6px 0"></div><div class="kpi" id="kpi"></div><div id="ttags"></div></section>
+<section id="group-section" class="card" aria-labelledby="group-title"><h2 id="group-title" style="margin:0">Group strength</h2><div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0"><button id="sbtn" onclick="tg(event)">Sort: median %</button><button id="ranking-view" onclick="window.MassiveLive?.toggleRankings()">顯示收市分析</button></div><div id="group-status" class="lab"></div><div id="grows"></div></section>
+<section id="leaders-section" aria-labelledby="top-title"><h2 id="top-title">Top 5 ↑ / Bottom 5 ↓</h2><div id="top-status" class="lab" style="margin-bottom:6px"></div><div class="tags" id="tb"></div></section>
+<section id="gap-section"><h2>Gap monitor <span style="color:#5c6577;font-weight:400;font-size:11px">· tap for meaning</span></h2><div class="card" id="gap" style="font-size:13px;cursor:pointer" onclick="showGap()"></div></section>
+<section id="earnings-section"><h2>Earnings nodes</h2><div class="card earn" id="earn"></div></section>
+<section id="history-section"><h2>Recent track</h2><div class="trend" id="trend"></div><div class="hist" id="hist"></div></section>
+</div>
 <div class="foot">Data patterns only — not investment advice · AES-256-GCM encrypted · <span class="e">E</span> = reported within past 24h · σ = intra-group dispersion · pos = (close−low)/(high−low)<br><span id="upd"></span></div>
 </div>
 <script>
@@ -312,7 +324,7 @@ async function showT(t){
  const m=findM(t);const d=document.getElementById("det");
  if(!m){d.style.display="none";return;}
  const sh=(D.sh&&D.sh[t])||[];
- d.innerHTML=`<span class="x" onclick="document.getElementById('det').style.display='none'">✕</span>
+ d.innerHTML=`<button type="button" class="x" aria-label="Close detail" onclick="closeDetail()">✕</button>
   <b>${t}</b> <span style="color:#aeb7c9">${nm(t)}</span> <span class="lab">${GN[m.g]||m.g}</span>${m.e?`<span class="e" style="cursor:pointer" onclick="showEPS('${t}')">reported past 24h — tap for est vs actual</span>`:''}
   <div style="display:flex;gap:14px;align-items:center;margin-top:6px">
    <div><div class="lab">收市升跌 ${D.date}</div><div class="val ${cls(m.c)}" style="font-size:16px">${fp(m.c,1)}</div></div>
@@ -324,13 +336,15 @@ async function showT(t){
   <div id="tchart" style="margin-top:8px">${spark(sh,120,30)}<div class="lab">loading YTD chart…</div></div>`;
  const liveEl=document.createElement("div");liveEl.className="lab live-quote";liveEl.dataset.liveSymbol=t;d.querySelector("b").after(liveEl);
  if(window.MassiveLive)MassiveLive.paint();
- d.style.display="block";window.scrollTo({top:0,behavior:"smooth"});
+ d.style.display="block";revealDetail(t);
  try{const chart=await fetchEnc("charts/"+t+".enc");if(d.querySelector('[data-live-symbol]')?.dataset.liveSymbol!==t)return;LASTC=chart;drawTickChart();}
  catch(e){const el=document.getElementById("tchart");if(el)el.innerHTML=spark(sh,120,30)+`<div class="lab">YTD chart unavailable · trend = last ${sh.length} daily % moves</div>`;}
 }
+function closeDetail(){document.getElementById("det").style.display="none";window.AppWorkspace?.onClose();}
+function revealDetail(t){if(window.AppWorkspace)window.AppWorkspace.onInspect(t);if(!matchMedia("(min-width:1100px)").matches)window.scrollTo({top:0,behavior:"smooth"});}
 function srch(q){
  q=q.trim().toUpperCase();
- if(!q){document.getElementById("det").style.display="none";return;}
+ if(!q){closeDetail();return;}
  if(findM(q)){showT(q);return;}
  if(D.names){ // search by company name
   const hit=Object.keys(D.names).find(t=>D.names[t].toUpperCase().includes(q));
@@ -471,7 +485,7 @@ async function showEPS(t){
  <div class="lab" style="margin-top:6px">EPS beat ≠ good print — guidance, revenue & margins drive the reaction (AAPL 07-30: beat EPS +1.6%, fell −7.4% next day). The market's verdict = the AH snapshot & next-day % already on this app.</div>
  <div class="lab" style="margin-top:3px">Source: Nasdaq consensus/reported EPS, analyst targets · surprise% = (act−est)/|est|</div>`);
 }
-function panel(html){const d=document.getElementById("det");d.innerHTML=`<span class="x" onclick="document.getElementById('det').style.display='none'">✕</span>`+html;d.style.display="block";window.scrollTo({top:0,behavior:"smooth"});}
+function panel(html){const d=document.getElementById("det");d.innerHTML=`<button type="button" class="x" aria-label="Close detail" onclick="closeDetail()">✕</button>`+html;d.style.display="block";revealDetail(null);}
 function showChar(){
  const s=D.stats;
  const rows=[
@@ -510,6 +524,7 @@ async function showAdv(){
 document.getElementById("pw").addEventListener("keydown",e=>{if(e.key==="Enter")unlock()});
 tryCache();
 </script>
+<script defer src="workspace.js?v=20261013-desktop1"></script>
 <script defer src="mobile_update.js?v=20260929-2"></script>
 <script defer src="automation_setup.js?v=20261002-1"></script>
 <script defer src="layer_bars_tab.js"></script>
@@ -524,7 +539,7 @@ tryCache();
   if(box)return;
   box=document.createElement('section');box.className='card';box.id='daily-reports';box.style.margin='12px 0';
   box.innerHTML='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><strong>每日報告 · 廣東話音頻</strong><button id="reports-refresh" type="button">重新檢查</button></div><div id="reports-status" class="lab" role="status" style="margin:8px 0"></div><select id="reports-select" aria-label="選擇報告" style="max-width:100%;margin-bottom:8px"></select><div id="reports-content"></div>';
-  document.getElementById('sub').after(box);
+  document.getElementById('reports-slot').append(box);
   document.getElementById('reports-refresh').onclick=()=>refresh(true);
   document.getElementById('reports-select').onchange=()=>show(manifest.reports.find(x=>x.path===document.getElementById('reports-select').value));
  }
@@ -565,5 +580,6 @@ tryCache();
 <script defer src="massive_live_core.js?v=20261013-five-minute-volume1"></script>
 <script defer src="massive_live.js?v=20261013-five-minute-volume1"></script>
 </body></html>
+
 
 

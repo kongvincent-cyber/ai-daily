@@ -16,7 +16,8 @@
     <p>此金鑰等同解鎖權限；只貼入上述私人項目的 Secret，唔好傳入對話或公開檔案。</p>
     <p>另需一次性設定發布權限 <code>APP_PUBLISH_TOKEN</code>。兩項完成後，從 GitHub Actions 驗證並啟用；未驗證前唔代表自動更新已生效。</p>`;
   const subtitle=document.getElementById('sub');
-  if(subtitle)subtitle.insertAdjacentElement('afterend',panel);
+  if(document.getElementById('feed-slot'))document.getElementById('feed-slot').append(panel);
+  else if(subtitle)subtitle.insertAdjacentElement('afterend',panel);
   else app.appendChild(panel);
   document.getElementById('automatic-copy').addEventListener('click',()=>{
     const msg=document.getElementById('automatic-copy-status');
@@ -79,3 +80,4 @@
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')tick();});
   status();
 })();
+
