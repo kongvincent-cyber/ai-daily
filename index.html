@@ -143,7 +143,7 @@ function checkOnReturn(){if(document.visibilityState!=="visible"||Date.now()-las
 document.addEventListener("visibilitychange",checkOnReturn);
 window.addEventListener("pageshow",checkOnReturn);
 window.addEventListener("online",checkOnReturn);
-async function loadDay(d){try{D=await fetchEnc("data/"+d+".enc");openG=null;render();}catch(e){}}
+async function loadDay(d){try{D=await fetchEnc("data/"+d+".enc");openG=null;LASTC=null;closeDetail();document.getElementById("q").value="";window.AppWorkspace?.onDayChange();render();}catch(e){}}
 function spark(seq,w=120,h=26){
  if(!seq||seq.length<2)return"";
  const vs=seq.map(p=>p.v!==undefined?p.v:p);

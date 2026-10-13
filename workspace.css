@@ -96,3 +96,4 @@
  #det{padding:18px}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+@media(min-width:1100px){#workspace .lab{font-size:12px}#massive-live{font-size:13px}button{cursor:pointer}}

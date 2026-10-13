@@ -35,6 +35,7 @@
    if(wide())inspector.scrollTop=0;
   },
   onClose(){empty.hidden=false;},
+  onDayChange(){clearResults();paintRecent();},
  };
  query.addEventListener('input',paintResults);
  query.addEventListener('keydown',e=>{
