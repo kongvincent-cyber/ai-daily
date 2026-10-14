@@ -278,6 +278,15 @@
       gap:{ready:ready&&opened.length===total,covered:opened.length,n:gaps.length,win:gaps.length?100*gaps.filter(x=>x.o2n>0).length/gaps.length:null,med:median(gaps.map(x=>x.o2n))},
       bursts:{ready:ready&&vols.length===total,covered:vols.length,up:vols.filter(x=>x.c>=4&&x.volume>x.previousVolume).length,down:vols.filter(x=>x.c<=-4&&x.volume>x.previousVolume).length,old:vols.filter(x=>now-x.volumeAt>120000).length},themes};
   }
+  // Completed daily packets are authoritative. Never feed a same-day closing
+  // baseline back into an intraday ranking or a second daily EMA observation.
+  function analysisView(packetDate,baseline,market,now,requested='live') {
+    const today=day(now),fresh=market&&Math.abs(now-Date.parse(market.serverTime))<180000;
+    const active=fresh&&(market.market==='open'||market.earlyHours||market.afterHours);
+    const eligible=!!(packetDate<today&&baseline?.asof<today&&
+      baseline?.next_session===today&&active);
+    return {eligible,live:eligible&&requested==='live'};
+  }
   function card(p,price,split) {
     if (!pos(price)) return '等候成交';
     if (split && split!==1) return '拆股後需核對原卡價位';
@@ -287,7 +296,8 @@
     if (price>=p.zone?.[0] && price<=p.zone?.[1]) return '在承接區；仍需收市確認';
     return `距突破 ${((p.bo/price-1)*100).toFixed(2)}%`;
   }
-  return {Book,Minutes,FiveMinutes,day,minuteET,timestamp,displayed,transport,classifyStatus,splitFactors,layer,rankings,metrics,card};
+  return {Book,Minutes,FiveMinutes,day,minuteET,timestamp,displayed,transport,classifyStatus,splitFactors,layer,rankings,metrics,analysisView,card};
 });
+
 
 
