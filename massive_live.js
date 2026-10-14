@@ -310,7 +310,8 @@
   }
   function paintRankings() {
     if(!started||!state.latest||typeof D==='undefined'||!D)return;
-    const now=Date.now(),historical=D.date!==state.latest.date,live=!historical&&rankingView==='live';
+    const now=Date.now(),historical=D.date!==state.latest.date;
+    const view=C.analysisView(D.date,state.baseline,state.market,now,rankingView),live=!historical&&view.live;
     const title=document.getElementById('group-title'),topTitle=document.getElementById('top-title'),container=document.getElementById('grows'),tb=document.getElementById('tb');
     if(!title||!container||!tb)return;
     const result=C.rankings(state.baseline,state.book,state.factors,now),byTicker=new Map(result.rows.map(x=>[x.t,x]));
@@ -319,7 +320,7 @@
     const phase=state.enabled?C.transport(state,now):'已暫停／未連接';
     title.textContent='Group strength · '+(live?'今日 '+session:'收市 '+D.date);
     topTitle.textContent='Top 5 ↑ / Bottom 5 ↓ · '+(live?'今日 '+session:'收市 '+D.date);
-    const toggle=document.getElementById('ranking-view');toggle.hidden=historical;toggle.textContent=live?'顯示收市分析':'顯示今日排行';
+    const toggle=document.getElementById('ranking-view');toggle.hidden=historical;toggle.disabled=!view.eligible;toggle.textContent=live?'顯示收市分析':view.eligible?'顯示今日排行':'已顯示最新收市分析';
     document.getElementById('group-status').textContent=live?
       '成員升跌幅中位數 · 對比上個交易日收市 · '+phase+' · 每秒更新排序；指數頁籤保留收市歷史。':
       '收市數字、五日走勢及排序 · '+D.date;
@@ -364,10 +365,11 @@
     }
   }
   function paintMetrics(now,historical) {
-    const live=!historical&&statsView==='live',m=C.metrics(state.latest,state.book,now);
+    const view=C.analysisView(D.date,state.baseline,state.market,now,statsView);
+    const live=!historical&&view.live,m=C.metrics(state.latest,state.book,now);
     const mode=C.transport(state,now),gap=m.gap,bursts=m.bursts;
     document.getElementById('closing-label').textContent=live?'今日市場統計 · '+m.session+' · 盤中暫算':'收市分析 · '+D.date+'（已完成交易日）';
-    const toggle=document.getElementById('stats-view');toggle.hidden=historical;toggle.textContent=live?'顯示收市分析':'返回今日盤中';
+    const toggle=document.getElementById('stats-view');toggle.hidden=historical;toggle.disabled=!view.eligible;toggle.textContent=live?'顯示收市分析':view.eligible?'返回今日盤中':'已顯示最新收市分析';
     document.getElementById('stats-status').textContent=live?`${mode} · 今日有效行情 ${m.covered}/${m.total}${m.at?' · 最新成員成交 '+clock(m.at):''}${m.old?' · '+m.old+' 隻超過兩分鐘未成交':''} · 合資格成交價對比上日收市；未作收市確認`:'歷史統計，不混入今日行情。';
     const missing=`等候全部成員今日報價 ${m.covered}/${m.total}`;
     const values=live?[
@@ -455,7 +457,14 @@
         const text=v.ready?`${g} ${v.index.toFixed(2)} · ${pct(v.change)} · 21EMA 試算 ${v.ema21.toFixed(2)} · 上漲 ${v.adv.toFixed(1)}%${v.carried?' · '+v.carried+' 隻沿用前收':''}${v.old?' · '+v.old+' 隻成交超過兩分鐘':''}`:
           `${g} 收市 ${spec.close.toFixed(2)}（${state.baseline.asof}） · ${v.reason}${v.total?' '+v.covered+'/'+v.total:''}`;
         layerEl.append(node('div',text,'lab'));
-        const inline=document.querySelector('[data-live-layer="'+g+'"]');if(inline){inline.hidden=historical;inline.textContent='盤中試算 · '+text;}
+        const inline=document.querySelector('[data-live-layer="'+g+'"]');
+        if(inline){
+          const live=!historical&&C.analysisView(D.date,state.baseline,market,now,rankingView).live;
+          const closing=state.baseline.asof===D.date;
+          inline.hidden=historical||(!live&&!closing);
+          inline.textContent=live?(session+'試算 · '+text):
+            '正式收市 · '+D.date+' · '+g+' '+spec.close.toFixed(2)+' · 21EMA '+spec.ema21.toFixed(2);
+        }
       }
       if(!state.baseline)layerEl.append(node('div','收市基準未載入；實時價仍可使用。','lab'));
     }
@@ -521,7 +530,7 @@
   }
   window.MassiveLive={packetChanged:packet=>{mount().then(()=>packetChanged(packet));},paint,stop,paintRankings,
     toggleStats:()=>{statsView=statsView==='live'?'close':'live';paint();},
-    toggleRankings:()=>{rankingView=rankingView==='live'?'close':'live';paintRankings();}};
+    toggleRankings:()=>{rankingView=rankingView==='live'?'close':'live';paint();}};
   document.addEventListener('visibilitychange',()=>{if(document.hidden&&state.enabled)stop('背景暫停','返回 App 後自動重新連線。');else if(!document.hidden&&state.key&&state.enabled)start();});
   window.addEventListener('pagehide',()=>stop('已暫停'));
   window.addEventListener('pageshow',e=>{if(e.persisted&&state.key&&state.enabled)start();});
@@ -529,6 +538,7 @@
   window.addEventListener('online',()=>{if(state.key&&state.enabled)start();});
   const probe=setInterval(()=>{if(typeof D!=='undefined'&&D&&typeof KEY!=='undefined'&&KEY){clearInterval(probe);mount();}},500);
 })();
+
 
 
 
