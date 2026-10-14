@@ -462,7 +462,7 @@
           const live=!historical&&C.analysisView(D.date,state.baseline,market,now,rankingView).live;
           const closing=state.baseline.asof===D.date;
           inline.hidden=historical||(!live&&!closing);
-          inline.textContent=live?(session+'試算 · '+text):
+          inline.textContent=live?((market?.earlyHours?'盤前':market?.afterHours?'盤後':'盤中')+'試算 · '+text):
             '正式收市 · '+D.date+' · '+g+' '+spec.close.toFixed(2)+' · 21EMA '+spec.ema21.toFixed(2);
         }
       }
