@@ -205,8 +205,10 @@
     const spec = baseline?.layers?.[g];
     const today = day(now);
     const active = market && (market.market === 'open' || market.earlyHours || market.afterHours);
-    if (!spec || !active || !factors || baseline.asof > today ||
-        Date.parse(today)-Date.parse(baseline.asof) > 7*86400000) return {ready:false,reason:'休市或基準未核實'};
+    if (!spec) return {ready:false,reason:'收市指數基準未載入'};
+    if (!active) return {ready:false,reason:'非交易時段；盤中試算暫停'};
+    if (!factors || baseline.asof > today ||
+        Date.parse(today)-Date.parse(baseline.asof) > 7*86400000) return {ready:false,reason:'拆股或前收基準未核實'};
     if(baseline.asof<today&&baseline.next_session!==today)return {ready:false,reason:'收市基準日期未跟上'};
     let sum=0,up=0,covered=0,carried=0,old=0;
     for (const t of spec.members) {
@@ -287,6 +289,18 @@
       baseline?.next_session===today&&active);
     return {eligible,live:eligible&&requested==='live'};
   }
+  // A verified dated close remains usable when the market is closed or the
+  // provider is unavailable. Only the next active session needs live inputs.
+  function layerView(packetDate,baseline,g,book,market,factors,now,requested='live') {
+    if (analysisView(packetDate,baseline,market,now,requested).live)
+      return {mode:'live',asof:day(now),...layer(baseline,g,book,market,factors,now)};
+    const spec=baseline?.layers?.[g];
+    if (baseline?.asof!==packetDate || !packetDate || packetDate>day(now))
+      return {mode:'unavailable',ready:false,reason:'收市基準與報告日期不一致'};
+    if (!pos(spec?.close)||!pos(spec?.ema21))
+      return {mode:'unavailable',ready:false,reason:'收市指數資料不完整'};
+    return {mode:'close',ready:true,asof:packetDate,index:Number(spec.close),ema21:Number(spec.ema21)};
+  }
   function card(p,price,split) {
     if (!pos(price)) return '等候成交';
     if (split && split!==1) return '拆股後需核對原卡價位';
@@ -296,8 +310,9 @@
     if (price>=p.zone?.[0] && price<=p.zone?.[1]) return '在承接區；仍需收市確認';
     return `距突破 ${((p.bo/price-1)*100).toFixed(2)}%`;
   }
-  return {Book,Minutes,FiveMinutes,day,minuteET,timestamp,displayed,transport,classifyStatus,splitFactors,layer,rankings,metrics,analysisView,card};
+  return {Book,Minutes,FiveMinutes,day,minuteET,timestamp,displayed,transport,classifyStatus,splitFactors,layer,layerView,rankings,metrics,analysisView,card};
 });
+
 
 
 
