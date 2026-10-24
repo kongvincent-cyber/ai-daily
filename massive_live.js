@@ -452,10 +452,16 @@
     }
     {
       layerEl.replaceChildren();
+      const layerLive=C.analysisView(state.latest.date,state.baseline,market,now).live;
+      cardEl.querySelector('[data-layer-details] summary').textContent=layerLive?'九層盤中指數 · 試算 · '+C.day(now):'九層收市指數 · '+state.latest.date;
+      cardEl.querySelector('[data-layer-note]').textContent=layerLive?
+        '沿用原來成員及等權日鏈，使用合資格彙總價。試算未寫入收市歷史，未觸發接棒、FTD 或派貨裁決。':
+        '顯示最近已發布交易日的正式收市指數及 21EMA；休市不影響已完成的收市結果。下一個有效交易時段自動恢復盤中試算。';
       for(const [g,spec] of Object.entries(state.baseline?.layers||{})) {
-        const v=C.layer(state.baseline,g,state.book,active?market:null,state.factors,now);
-        const text=v.ready?`${g} ${v.index.toFixed(2)} · ${pct(v.change)} · 21EMA 試算 ${v.ema21.toFixed(2)} · 上漲 ${v.adv.toFixed(1)}%${v.carried?' · '+v.carried+' 隻沿用前收':''}${v.old?' · '+v.old+' 隻成交超過兩分鐘':''}`:
-          `${g} 收市 ${spec.close.toFixed(2)}（${state.baseline.asof}） · ${v.reason}${v.total?' '+v.covered+'/'+v.total:''}`;
+        const v=C.layerView(state.latest.date,state.baseline,g,state.book,market,state.factors,now);
+        const text=v.mode==='close'?`${g} 正式收市 ${v.index.toFixed(2)}（${v.asof}） · 21EMA ${v.ema21.toFixed(2)}`:
+          v.ready?`${g} ${v.index.toFixed(2)} · ${pct(v.change)} · 21EMA 試算 ${v.ema21.toFixed(2)} · 上漲 ${v.adv.toFixed(1)}%${v.carried?' · '+v.carried+' 隻沿用前收':''}${v.old?' · '+v.old+' 隻成交超過兩分鐘':''}`:
+          `${g} · ${v.reason}${v.total?' '+v.covered+'/'+v.total:''} · 最近收市基準 ${spec.close.toFixed(2)}（${state.baseline.asof}）`;
         layerEl.append(node('div',text,'lab'));
         const inline=document.querySelector('[data-live-layer="'+g+'"]');
         if(inline){
@@ -520,8 +526,9 @@
     cardEl.append(node('div','收市選股卡維持原價位；盤中價位比較只作監察，突破仍需成交量、承接仍需收市確認。','lab'));
     const historical=node('div',null,'lab');historical.dataset.historyWarning='';cardEl.append(historical);
     const picks=node('div');picks.dataset.livePicks='';cardEl.append(picks);
-    const ld=node('details');ld.dataset.layerDetails='';ld.append(node('summary','九層盤中指數 · 試算'));
-    layerEl=node('div');ld.append(layerEl,node('div','沿用原來成員及等權日鏈，使用合資格彙總價。試算未寫入收市歷史，未觸發接棒、FTD 或派貨裁決。','lab'));ld.ontoggle=paint;cardEl.append(ld);
+    const ld=node('details');ld.dataset.layerDetails='';ld.append(node('summary','九層指數'));
+    const layerNote=node('div',null,'lab');layerNote.dataset.layerNote='';
+    layerEl=node('div');ld.append(layerEl,layerNote);ld.ontoggle=paint;cardEl.append(ld);
     const pd=node('details');pd.dataset.priceDetails='';pd.append(node('summary','全部股票／基準 · 價格及買賣盤'));
     const search=node('input');search.type='search';search.placeholder='Search ticker or name';search.dataset.liveSearch='';search.setAttribute('aria-label','搜尋實時股票');search.oninput=paint;tableEl=node('div');pd.append(search,tableEl);pd.ontoggle=paint;cardEl.append(pd);
     document.getElementById('feed-slot').append(cardEl);
@@ -538,6 +545,7 @@
   window.addEventListener('online',()=>{if(state.key&&state.enabled)start();});
   const probe=setInterval(()=>{if(typeof D!=='undefined'&&D&&typeof KEY!=='undefined'&&KEY){clearInterval(probe);mount();}},500);
 })();
+
 
 
 
