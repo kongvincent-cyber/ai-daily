@@ -50,6 +50,19 @@ button{background:#1b2230;color:#aeb7c9;border:1px solid #2a3448;border-radius:8
 #det{position:sticky;top:6px;z-index:5;box-shadow:0 6px 24px rgba(0,0,0,.5);display:none}
 #det .x{float:right;color:#8a93a6;cursor:pointer;padding:0 4px}
 .trend{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.benchmark-card{text-align:left;min-width:0;width:100%;cursor:pointer;color:#e6e8ee;padding:9px 10px;overflow-wrap:anywhere}
+.benchmark-card .benchmark-name{font-size:12px;font-weight:600;color:#cdd3de;line-height:1.4}
+.benchmark-card .benchmark-numbers{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:3px 7px;margin:4px 0}
+.benchmark-card .val{font-size:19px;margin:0}.benchmark-card [data-benchmark-price]{font-size:14px;font-weight:600}
+.benchmark-card [data-benchmark-ma]{font-size:11px;line-height:1.5;margin-top:5px}
+.benchmark-card [data-benchmark-status]{font-size:10px;line-height:1.5;margin-top:4px}
+.benchmark-card[data-benchmark="SOXX"]{grid-column:1/-1}
+#benchmark-kpi{gap:7px;margin:8px 0}#benchmark-more{margin:6px 0 12px}
+#benchmark-more summary{cursor:pointer;font-size:12px;color:#aeb7c9;padding:5px 0}
+#benchmark-extra{margin-top:6px}.benchmark-detail-table{width:100%;border-collapse:collapse;font-size:11px;font-variant-numeric:tabular-nums}
+.benchmark-detail-table td,.benchmark-detail-table th{padding:5px 3px;text-align:right;border-bottom:1px solid #273247}
+.benchmark-detail-table td:first-child,.benchmark-detail-table th:first-child{text-align:left}
+@media(min-width:1100px){#benchmark-section .benchmark-card{padding:10px 12px}#benchmark-section .benchmark-card .val{font-size:21px}}
 </style><link rel="stylesheet" href="workspace.css?v=20261013-desktop1"></head><body>
 <div id="lock"><img src="icon-180.png" width="64" height="64" style="border-radius:14px">
 <div style="font-size:17px;font-weight:700">AI 6-Layer Daily</div>
@@ -79,8 +92,8 @@ button{background:#1b2230;color:#aeb7c9;border:1px solid #2a3448;border-radius:8
 <div class="card" id="det" aria-label="Selected stock or analysis"></div>
 </aside>
 <div class="chips" id="chips"></div>
+<section id="benchmark-section" aria-labelledby="benchmark-label"><h2 id="benchmark-label">主要市場 · ETF 代理</h2><div class="lab">日變幅與200天線狀態分開顯示 · 點選查看收市歷史</div><div class="kpi" id="benchmark-kpi"></div><details id="benchmark-more"><summary>更多比較 · 等權標普500 RSP</summary><div id="benchmark-extra"></div></details></section>
 <section id="strike-section" aria-label="Daily strike plan"><div id="strike"></div></section>
-<section id="benchmark-section" aria-labelledby="benchmark-label"><h2 id="benchmark-label">SPY / QQQ · 行情</h2><div class="kpi" id="benchmark-kpi"></div></section>
 <section id="statistics-section" aria-labelledby="closing-label"><h2 id="closing-label">收市分析</h2><button id="stats-view" onclick="window.MassiveLive?.toggleStats()">顯示收市分析</button><div id="stats-status" class="lab" style="margin:6px 0"></div><div class="kpi" id="kpi"></div><div id="ttags"></div></section>
 <section id="group-section" class="card" aria-labelledby="group-title"><h2 id="group-title" style="margin:0">Group strength</h2><div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0"><button id="sbtn" onclick="tg(event)">Sort: median %</button><button id="ranking-view" onclick="window.MassiveLive?.toggleRankings()">顯示收市分析</button></div><div id="group-status" class="lab"></div><div id="grows"></div></section>
 <section id="leaders-section" aria-labelledby="top-title"><h2 id="top-title">Top 5 ↑ / Bottom 5 ↓</h2><div id="top-status" class="lab" style="margin-bottom:6px"></div><div class="tags" id="tb"></div></section>
@@ -173,7 +186,7 @@ function renderStrike(){
  if(!P||!P.picks){el.innerHTML="";return;}
  const gate=(P.regime&&P.regime.gate)||"正常";
  const gc=gate==="正常"?"#4cc38a":(gate==="減注"?"#ffd479":"#ff7a6b");
- const gt=gate==="正常"?"Regime OK":(gate==="減注"?"Reduce size 減注":"HALT 停手");
+ const gt=gate==="正常"?"QQQ 短線 · 正常":(gate==="減注"?"QQQ 短線 · Reduce size 減注":"QQQ 短線 · HALT 停手");
  el.innerHTML=`<div class="card" style="border-color:#5c4a1e;background:linear-gradient(180deg,#1c170e,#161b26);margin:10px 0">
   <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
    <b style="font-size:14px;color:#ffd479">⚔ Today's strike plan · 今日出擊</b>
@@ -197,7 +210,7 @@ function showGate(){
   const nf=(o.nf!=null)?o.nf:"—";
   return `<div style="font-size:12.5px;margin:4px 0"><b>${NM2[k]}</b>：正宗（FTD後）<b class="${nf>=3?"neg":(nf>=2?"":"pos")}" ${nf===2?'style="color:#ffd479"':''}>${nf}個</b> · 保守（8日窗）<b>${o.n}個</b><br><span class="lab">${ds}</span></div>`;
  }).join("");
- panel(`<b>倉位檔位${R.gate?` — ${R.gate}`:""}（distribution day派貨日）</b>
+ panel(`<b>QQQ 短線出擊檔位${R.gate?` — ${R.gate}`:""}（distribution day派貨日）</b>
   <div style="font-size:13px;margin:5px 0 2px">最近FTD（Follow-Through Day）：<b>${R.ftd||"—"}</b></div>
   <div class="lab" style="margin:5px 0"><b>兩把尺</b>：①<b>正宗O'Neil</b>＝FTD翌日起錶重新計（新反彈嘅健康度）；②<b>保守</b>＝最近8個交易日滾動窗（包括見底前嘅派貨日，會隨時間自動碌出窗）。目前檔位由<b>保守尺（QQQ）</b>話事——寧緊勿鬆。</div>
   <div class="lab" style="margin:5px 0"><b>派貨日定義</b>：當日收市跌≥0.2% 且 成交量高過前一日——價跌+量增＝機構出貨腳印；縮量下跌唔算（冇量＝大戶冇走）。</div>
@@ -225,11 +238,14 @@ function render(){
  document.getElementById("sub").textContent=`收市基準 ${D.date} (${wd}) · universe ${D.usize||255}`+(D.miss.length?` · ${D.miss.length} missing`:"");
  document.getElementById("chips").innerHTML=
   `<span class="chip" style="cursor:pointer" onclick="showChar()">${charTxt()} <span style="color:#5c6577">ⓘ</span></span>`+
-  `<span class="chip" style="cursor:pointer" onclick="showRegime()">${D.regime==="牛"?"Bull":"Bear"} · SPY vs 200DMA ${fp(D.spy.ma200,1)} <span style="color:#5c6577">ⓘ</span></span>`+
+  `<span class="chip" style="cursor:pointer" onclick="showRegime()">SPY 長線 · ${D.regime==="牛"?"Bull":"Bear"} · vs 200DMA ${fp(D.spy.ma200,1)} <span style="color:#5c6577">ⓘ</span></span>`+
   (D.lead3.length?`<span class="chip">3-day leaders: ${D.lead3.map(g=>GN[g]||g).join(", ")}</span>`:"");
  renderStrike();
  document.getElementById('closing-label').textContent='收市分析 · '+D.date+'（以下統計不是盤中報價）';
- document.getElementById('benchmark-kpi').innerHTML=['SPY','QQQ'].map(t=>`<div class="card" data-benchmark="${t}" onclick="show${t}()" style="cursor:pointer"><div class="lab">${t} · 點擊看收市歷史</div><div class="val" data-benchmark-return>—</div><div data-benchmark-price></div><div class="lab" data-benchmark-status>等候行情</div></div>`).join('');
+ const bmNames={SPY:'S&P 500 · 標普500',QQQ:'Nasdaq-100 · 納指100',DIA:'Dow Jones · 道指',IWM:'Russell 2000 · 小型股',SOXX:'Semiconductors · 半導體',RSP:'S&P 500 · 等權標普'};
+ const bmCard=t=>`<button type="button" class="card benchmark-card" data-benchmark="${t}" onclick="window.MassiveLive?.showBenchmark('${t}')" aria-label="${bmNames[t]} ${t} 收市歷史"><div class="benchmark-name">${bmNames[t]} <span class="lab">${t}</span></div><div class="benchmark-numbers"><span data-benchmark-price>—</span><span class="val" data-benchmark-return>—</span></div><div class="lab" data-benchmark-ma>200DMA · 資料待核實</div><div class="lab" data-benchmark-status>載入收市資料</div></button>`;
+ document.getElementById('benchmark-kpi').innerHTML=['SPY','QQQ','DIA','IWM','SOXX'].map(bmCard).join('');
+ document.getElementById('benchmark-extra').innerHTML=bmCard('RSP');
  document.getElementById("kpi").innerHTML=[
   ["Capex − Software",fp(D.bloc.cap-D.bloc.sw)+"pp",cls(D.bloc.cap-D.bloc.sw),"showCapSw"],
   ["Advancers (of "+(D.usize||255)+")",D.stats.up+"%",D.stats.up>=50?"pos":"neg","showAdv"],
@@ -503,8 +519,10 @@ function showChar(){
   <div class="lab" style="margin-top:4px">Leaders = the 2 groups with the highest median day % that session.</div>`);
 }
 function showRegime(){
- panel(`<b>Regime — the master risk switch</b>
-  <div class="lab" style="margin-top:6px">SPY above its 200-day moving average = <b>Bull</b>; below = <b>Bear</b>. In the research framework behind this app, new entries are only taken in Bull regime — regime beats position size beats price stops. The % shown is SPY's distance above/below the 200DMA (today ${fp(D.spy.ma200,1)}), i.e. how much cushion the regime has before flipping.</div>`);
+ panel(`<b>SPY 長線 regime · 200天平均線</b>
+  <div class="lab" style="margin-top:6px">沿用原研究規則：SPY 收市高於200天平均線為 <b>Bull</b>，否則為 <b>Bear</b>。原研究框架只在 Bull regime 考慮新入場。</div>
+  <div style="font-size:13px;margin-top:7px">${D.date} 收市 · SPY 距200天線 <b>${fp(D.spy.ma200,1)}</b>；這是均線距離，並非當日升跌。</div>
+  <div class="lab" style="margin-top:7px">這個標籤描述 SPY 的長線趨勢。「今日出擊」另按 QQQ 派貨日決定短線檔位，所以 Bull 與減注可以同時出現。其他市場的200天線只作比較，不影響出擊檔位。</div>`);
 }
 async function showGap(){
  const g=D.gapmon; let chart="";
@@ -580,6 +598,7 @@ tryCache();
 <script defer src="massive_live_core.js?v=20261024-layer-close1"></script>
 <script defer src="massive_live.js?v=20261024-layer-close1"></script>
 </body></html>
+
 
 
 

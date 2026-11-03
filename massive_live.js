@@ -11,9 +11,10 @@
   const money=x=>Number.isFinite(x)?'$'+x.toFixed(x<1?4:2):'—';
   const pct=x=>(x>0?'+':'')+x.toFixed(2)+'%';
   const clock=t=>new Date(t).toLocaleString('zh-HK',{timeZone:'Asia/Hong_Kong',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false})+' 香港';
+  const benchmarkNames={SPY:'S&P 500 · 標普500',QQQ:'Nasdaq-100 · 納指100',DIA:'Dow Jones · 道指',IWM:'Russell 2000 · 小型股',SOXX:'Semiconductors · 半導體',RSP:'S&P 500 · 等權標普'};
   function node(tag,value,className) {const e=document.createElement(tag);if(value!=null)e.textContent=value;if(className)e.className=className;return e;}
   function message(phase,detail='') {state.phase=phase;state.detail=detail;paint();}
-  function symbols() {return [...new Set(Object.values(state.latest?.members||{}).flat().map(m=>m.t).concat(['SPY','QQQ','IWM','RSP','SMH','SOXX']))].filter(t=>/^[A-Z][A-Z0-9.\-]{0,14}$/.test(t));}
+  function symbols() {return [...new Set(Object.values(state.latest?.members||{}).flat().map(m=>m.t).concat(['SPY','QQQ','IWM','RSP','SMH','SOXX','DIA']))].filter(t=>/^[A-Z][A-Z0-9.\-]{0,14}$/.test(t));}
   async function deviceKey() {
     if (typeof KEY==='undefined'||!KEY) throw Error('Unlock');
     return crypto.subtle.importKey('raw',await crypto.subtle.exportKey('raw',KEY),{name:'AES-GCM'},false,['encrypt','decrypt']);
@@ -406,6 +407,84 @@
       D.gapmon.n?`${D.gapmon.n} names gapped up >5% | open→close median ${pct(D.gapmon.med)} | win rate ${D.gapmon.win}% · 收市 ${D.date}`:'No >5% gap-ups · 收市 '+D.date;
     gapEl.onclick=live?()=>document.querySelector('[data-stat="2"]').click():showGap;
   }
+  function benchmarkRows(t,date) {
+    const packet=state.baseline?.benchmarks;
+    if(packet?.schema!==1||!/^\d{4}-\d{2}-\d{2}$/.test(packet.asof||''))return [];
+    const cutoff=[date,packet.asof,state.baseline.asof].sort()[0];
+    const rows=packet.symbols?.[t]?.rows;
+    if(!Array.isArray(rows))return [];
+    return rows.filter(r=>r&&/^\d{4}-\d{2}-\d{2}$/.test(r.date||'')&&r.date<=cutoff&&Number.isFinite(r.close)&&r.close>0)
+      .slice().sort((a,b)=>a.date.localeCompare(b.date));
+  }
+  function benchmarkClose(t,date,allowOlder=false) {
+    const rows=benchmarkRows(t,date),own=rows.find(r=>r.date===date);
+    if(own)return {...own,stale:false};
+    // A legacy packet has only its own SPY / QQQ fields. Never reuse QQQ for another ETF.
+    if(D?.date===date&&t==='SPY'&&D.spy) {
+      const close=Number.isFinite(D.spy.px)&&D.spy.px>0?D.spy.px:null;
+      const distance=Number.isFinite(D.spy.ma200)?D.spy.ma200:null;
+      if(close!==null||Number.isFinite(D.spy.chg)||distance!==null)return {date,close,
+        change_pct:Number.isFinite(D.spy.chg)?D.spy.chg:null,distance_pct:distance,
+        ma200:close!==null&&distance!==null&&distance>-100?close/(1+distance/100):null,stale:false,legacy:true};
+    }
+    if(D?.date===date&&t==='QQQ'&&Number.isFinite(D.qqq))return {date,close:null,change_pct:D.qqq,ma200:null,distance_pct:null,stale:false,legacy:true};
+    return allowOlder&&rows.length?{...rows[rows.length-1],stale:true}:null;
+  }
+  function paintBenchmarks(now,historical,session,active) {
+    if(!D?.date)return;
+    const title=document.getElementById('benchmark-label');
+    title.textContent=historical?'主要市場 · 收市歷史 '+D.date:
+      active?'主要市場 · 今日行情 '+C.day(now):'主要市場 · 最近收市 '+D.date;
+    document.querySelectorAll('[data-benchmark]').forEach(el=>{
+      const t=el.dataset.benchmark,closing=benchmarkClose(t,D.date,!historical);
+      const row=state.book.rows.get(t),quote=C.displayed(row);
+      const current=!historical&&Number.isFinite(quote?.price)&&quote.price>0&&Number.isFinite(quote.priceAt)&&
+        quote.priceAt<=now&&C.day(quote.priceAt)===C.day(now);
+      const returnReady=current&&Number.isFinite(row?.previousClose)&&row.previousClose>0&&row.previousCloseSession===C.day(now);
+      const change=current?(returnReady?(quote.price/row.previousClose-1)*100:null):
+        Number.isFinite(closing?.change_pct)?closing.change_pct:null;
+      const price=current?quote.price:closing?.close;
+      const value=el.querySelector('[data-benchmark-return]');
+      value.textContent=change==null?'—':pct(change);value.className='val '+(change>0?'pos':change<0?'neg':'neu');
+      el.querySelector('[data-benchmark-price]').textContent=Number.isFinite(price)?money(price):'—';
+      const ma=el.querySelector('[data-benchmark-ma]'),distance=closing?.distance_pct;
+      ma.className='lab '+(Number.isFinite(distance)?cls(distance):'neu');
+      ma.textContent=Number.isFinite(distance)?`距200DMA ${pct(distance)} · ${distance>0?'上方':distance<0?'下方':'持平'} · ${closing.date} 收市`:
+        closing?`200DMA · 資料不足 · ${closing.date}`:'200DMA · 資料未取得';
+      const status=el.querySelector('[data-benchmark-status]');
+      status.textContent=current?
+        `${active?session:'今日最後成交'} · ${clock(quote.priceAt)}${now-quote.priceAt>120000?' · 最後價／非新成交':''} · ${returnReady?'日變幅 vs 上日收市':'日變幅基準待核實'}`:
+        closing?`${closing.stale?'資料過期 · 最後可用收市':'收市'} ${closing.date} · 日變幅 vs 上日收市${historical?' · 歷史資料':''}`:
+        `${D.date} 收市資料未取得${historical?' · 不沿用其他交易日':''}`;
+    });
+  }
+  function benchmarkChart(rows) {
+    const points=rows.slice(-60).filter(r=>Number.isFinite(r.distance_pct));
+    if(points.length<2)return '<div class="lab" style="margin:9px 0">可用均線歷史不足，暫未繪圖。</div>';
+    const w=520,h=150,pad=18,lo=Math.min(0,...points.map(r=>r.distance_pct)),hi=Math.max(0,...points.map(r=>r.distance_pct)),range=hi-lo||1;
+    const x=i=>pad+i*(w-pad*2)/(points.length-1),y=v=>h-pad-(v-lo)*(h-pad*2)/range;
+    const line=points.map((r,i)=>x(i).toFixed(1)+','+y(r.distance_pct).toFixed(1)).join(' ');
+    return `<div class="lab" style="margin:9px 0 4px">距200天線 · 最近${points.length}個有完整資料的交易日</div>`+
+      `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="距200天平均線歷史，虛線為零" style="width:100%;height:auto;background:#10151f;border-radius:8px"><line x1="${pad}" x2="${w-pad}" y1="${y(0)}" y2="${y(0)}" stroke="#5c6577" stroke-dasharray="4 4"/><polyline points="${line}" fill="none" stroke="#83bae9" stroke-width="2"/>${points.map((r,i)=>`<circle cx="${x(i)}" cy="${y(r.distance_pct)}" r="2" fill="#83bae9"><title>${r.date} · ${pct(r.distance_pct)}</title></circle>`).join('')}</svg>`+
+      `<div class="lab" style="display:flex;justify-content:space-between"><span>${points[0].date}</span><span>${points[points.length-1].date}</span></div>`;
+  }
+  function showBenchmark(t) {
+    if(!benchmarkNames[t]||!D?.date)return;
+    const date=D.date,historical=date!==state.latest.date,rows=benchmarkRows(t,date),exact=benchmarkClose(t,date,false);
+    const visible=rows.slice(-10),selected=exact||(!historical?benchmarkClose(t,date,true):null);
+    if(!visible.length&&exact)visible.push(exact);
+    const descriptions={SPY:'追蹤標普500的大型股 ETF。原有長線 regime 仍由 SPY 的正式收市與200天線判斷。',
+      QQQ:'追蹤 Nasdaq-100 的 ETF；這是納指100，與 Nasdaq Composite 綜合指數不同。QQQ 派貨日短線檔位另行顯示。',
+      DIA:'追蹤 Dow Jones Industrial Average 的 ETF；道指由30隻藍籌股組成，按股價加權。',
+      IWM:'追蹤 Russell 2000 的小型股 ETF，用來對照大型股以外的市場表現。',
+      SOXX:'半導體行業 ETF，追蹤 NYSE Semiconductor Index；這個報價不是費城 SOX 指數點數。',
+      RSP:'等權標普500 ETF。與 SPY 比較可觀察權重集中情況；它並非升跌家數或完整市場寬度。'};
+    const summary=selected?`<div style="margin:8px 0;font-size:13px">${selected.date} 收市 <b>${money(selected.close)}</b> · 日變幅 <b class="${cls(selected.change_pct)}">${Number.isFinite(selected.change_pct)?pct(selected.change_pct):'—'}</b><br>200DMA ${money(selected.ma200)} · 距離 <b class="${cls(selected.distance_pct)}">${Number.isFinite(selected.distance_pct)?pct(selected.distance_pct):'—'}</b>${selected.stale?'<br><span class="neg">資料過期，顯示最後可用收市。</span>':''}</div>`:
+      `<div class="lab" style="margin:9px 0">${date} 收市資料未取得；未以其他日期補代。</div>`;
+    const table=visible.length?`<table class="benchmark-detail-table"><thead><tr><th>收市日期</th><th>ETF 股價</th><th>日變幅</th><th>距200DMA</th></tr></thead><tbody>${visible.slice().reverse().map(r=>`<tr><td>${r.date}</td><td>${money(r.close)}</td><td class="${cls(r.change_pct)}">${Number.isFinite(r.change_pct)?pct(r.change_pct):'—'}</td><td class="${cls(r.distance_pct)}">${Number.isFinite(r.distance_pct)?pct(r.distance_pct):'—'}</td></tr>`).join('')}</tbody></table>`:'';
+    const legacyChart=!historical&&(t==='SPY'||t==='QQQ')?`<button type="button" style="margin-top:9px" onclick="show${t}()">原有完整日線圖</button>`:'';
+    panel(`<div data-benchmark-detail="${t}"><b>${benchmarkNames[t]} · ${t}</b><div class="lab" style="margin-top:6px">${descriptions[t]} 價格單位為美元／ETF 股。</div>${summary}${benchmarkChart(rows)}${table}<div class="lab" style="margin-top:8px">均線與距離使用各日正式收市資料；少於200個交易日或資料未齊時顯示「—」。歷史只顯示至所選日期 ${date}。</div>${legacyChart}</div>`);
+  }
   function paint() {
     if(!started||!state.latest)return;
     const now=Date.now(),market=state.market;
@@ -420,18 +499,9 @@
     const historical=typeof D!=='undefined'&&D&&D.date!==state.latest.date;
     const hk=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Hong_Kong',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
     document.getElementById('session-clock').textContent=`香港日期 ${hk} · 美東日期 ${C.day(now)} · ${session} · 最新收市資料 ${state.latest.date}（收市歷史不等於今日盤中）`;
-    document.getElementById('benchmark-label').textContent=historical?'SPY / QQQ · 收市歷史 '+D.date:'SPY / QQQ · 今日行情 '+C.day(now);
-    document.querySelectorAll('[data-benchmark]').forEach(el=>{
-      const t=el.dataset.benchmark,row=state.book.rows.get(t),p=C.displayed(row);
-      const current=p?.price&&C.day(p.priceAt)===C.day(now);
-      const change=historical?(t==='SPY'?D.spy.chg:D.qqq):(current&&row.previousClose>0&&row.previousCloseSession===C.day(now)?(p.price/row.previousClose-1)*100:null);
-      const value=el.querySelector('[data-benchmark-return]');
-      value.textContent=change==null?'—':pct(change);value.className='val '+(change>0?'pos':change<0?'neg':'neu');
-      el.querySelector('[data-benchmark-price]').textContent=historical?'':p?.price?money(p.price):'等候報價';
-      el.querySelector('[data-benchmark-status]').textContent=historical?'歷史收市升跌；不混入今日行情':`${C.transport(state,now)} · ${p?.price?clock(p.priceAt):'尚無報價'}${!current||now-p?.priceAt>120000?' · 最後價／非新成交':''} · ${change==null?'升跌基準待核實':'對比上一交易日收市'}`;
-    });
+    paintBenchmarks(now,historical,session,active);
     const benchmarks=cardEl.querySelector('[data-live-benchmarks]');
-    benchmarks.textContent=['SPY','QQQ','SOXX'].map(t=>{const row=state.book.rows.get(t),p=C.displayed(row);return t+' '+(p?.price?money(p.price)+(row.previousClose&&C.day(p.priceAt)===C.day(now)?' '+pct((p.price/row.previousClose-1)*100):'')+' · '+clock(p.priceAt)+(now-p.priceAt>120000?' · 最後價':''):'等候報價');}).join(' ｜ ');
+    benchmarks.textContent='主要市場、日變幅及200天線比較見下方「主要市場」。';
     document.querySelectorAll('[data-live-symbol]').forEach(el=>{
       el.hidden=historical;
       if(!historical) {
@@ -494,6 +564,7 @@
     const previous=state.book;state.book=new C.Book(symbols());
     for(const [t,r] of previous?.rows||[])if(state.book.symbols.has(t))state.book.rows.set(t,r);
     if(started&&state.key&&state.enabled)await start();
+    else if(started){await loadBaseline();paint();}
   }
   async function mount() {
     if(started||typeof D==='undefined'||!D||typeof KEY==='undefined'||!KEY)return;
@@ -535,7 +606,7 @@
     paintTimer=setInterval(paint,1000);state.key=await restoreKey();setup.open=!state.key;
     if(state.key)await start();else {message('未連接','呢部裝置未載入 Massive key；請在下方連接，唔使重新訂閱。');await loadBaseline();paint();}
   }
-  window.MassiveLive={packetChanged:packet=>{mount().then(()=>packetChanged(packet));},paint,stop,paintRankings,
+  window.MassiveLive={packetChanged:packet=>{mount().then(()=>packetChanged(packet));},paint,stop,paintRankings,showBenchmark,
     toggleStats:()=>{statsView=statsView==='live'?'close':'live';paint();},
     toggleRankings:()=>{rankingView=rankingView==='live'?'close':'live';paint();}};
   document.addEventListener('visibilitychange',()=>{if(document.hidden&&state.enabled)stop('背景暫停','返回 App 後自動重新連線。');else if(!document.hidden&&state.key&&state.enabled)start();});
@@ -545,6 +616,7 @@
   window.addEventListener('online',()=>{if(state.key&&state.enabled)start();});
   const probe=setInterval(()=>{if(typeof D!=='undefined'&&D&&typeof KEY!=='undefined'&&KEY){clearInterval(probe);mount();}},500);
 })();
+
 
 
 
