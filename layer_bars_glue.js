@@ -64,6 +64,28 @@
     ma.style.cssText='font-size:12px;line-height:1.7'; card.appendChild(ma);
     var note = document.createElement('p'); note.style.fontSize='11px';
     note.textContent='直接由全體合資格股票計算，唔係各 layer 等權平均。拆股已調整；不含股息再投資。歷史採現有成員回溯。';card.appendChild(note);
+    var quality = document.createElement('p'); quality.style.cssText='font-size:12px;line-height:1.7';
+    var coverage = data.meta.coverage || [], today = coverage[coverage.length-1];
+    var audit = data.meta.independent_source;
+    quality.textContent = '缺價採最後有效價估值；恢復報價時計入累積變動。' +
+      (today ? ' 今日實際報價 '+today.observed+'；沿用估值 '+today.carried+'。' : '') +
+      (audit ? ' 第二來源收市價核對：'+audit.matched+'/'+audit.expected+' 一致。'+(audit.status==='price_agreement_all'?'':'其餘未核實或有差異。') : ' 第二來源核對未完成。');
+    card.appendChild(quality);
+    if (today && today.layers) {
+      var layerQuality=document.createElement('p');layerQuality.style.fontSize='11px';
+      layerQuality.textContent=Object.keys(today.layers).map(function(g){var x=today.layers[g];return g+' 報價 '+x.observed+'／估值 '+x.valued+'（沿用 '+x.carried+'）';}).join(' · ');
+      card.appendChild(layerQuality);
+    }
+    var exceptions=audit && audit.exceptions || [];
+    var flags=data.meta.valuation_flags || [];
+    if (exceptions.length || flags.length) {
+      var details=document.createElement('details'), heading=document.createElement('summary');
+      heading.textContent='核對差異及歷史缺價紀錄';details.appendChild(heading);
+      var list=document.createElement('ul');list.style.cssText='font-size:11px;max-height:220px;overflow:auto';
+      exceptions.forEach(function(x){var li=document.createElement('li');li.textContent=x.ticker+' '+x.date+'：'+x.status+'；主來源 '+x.primary_close+'／第二來源 '+x.secondary_close;list.appendChild(li);});
+      flags.forEach(function(x){var li=document.createElement('li');li.textContent=x.ticker+' '+x.date+'：沿用 '+x.last_observed+' 估值（'+x.stale_sessions+' 個交易日）；'+x.reason;list.appendChild(li);});
+      details.appendChild(list);card.appendChild(details);
+    }
     host.parentNode.insertBefore(card,host);
   }
   function decorate() {
@@ -110,4 +132,3 @@
   function safe() { try { decorate(); } catch (e) { console.warn('LB glue', e); } }
   global.LBGlue = { afterGroupTable: safe, afterLevelDetail: safe };
 })(window);
-
