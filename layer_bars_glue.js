@@ -36,12 +36,12 @@
     var data = typeof D !== 'undefined' && D && D.aiUniverseIndex;
     var old = document.getElementById('ai-universe-index');
     if (!data || !data.meta || data.meta.status !== 'verified' || data.meta.asof !== D.date) {
-      if (old) old.remove();
+      if (old) { if(old._indexChart) old._indexChart.destroy(); old.remove(); }
       return;
     }
     var key = D.date + ':' + (D.indexRevision || '');
     if (old && old.getAttribute('data-revision') === key) return;
-    if (old) old.remove();
+    if (old) { if(old._indexChart) old._indexChart.destroy(); old.remove(); }
     var c = data.c, last = c[c.length - 1], prev = c[c.length - 2];
     if (!Number.isFinite(last) || !Number.isFinite(prev) || prev <= 0) return;
     var card = document.createElement('details'); card.id = 'ai-universe-index';
@@ -52,6 +52,10 @@
     var description = document.createElement('p');
     description.textContent = D.date + ' 收市 · ' + data.member_count + ' 隻成員 · 每股等權日鏈 · ' + data.meta.base + '=100';
     description.style.fontSize = '12px'; card.appendChild(description);
+    if(data.timeframes && global.LayerBars && global.LayerBars.mountTimeframes){
+      var panel=document.createElement('div');card.appendChild(panel);
+      card._indexChart=global.LayerBars.mountTimeframes(panel,data.timeframes,'全 AI 等權指數');
+    } else {
     var values = c.slice(-126), low = Math.min.apply(null, values), high = Math.max.apply(null, values);
     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', '0 0 600 160'); svg.setAttribute('role','img'); svg.setAttribute('aria-label','全 AI 等權指數最近六個月走勢');
@@ -62,6 +66,7 @@
     var ma = document.createElement('p');
     ma.textContent = [['21EMA','e21'],['50SMA','s50'],['150SMA','s150'],['200SMA','s200']].map(function(x){var v=data[x[1]][c.length-1];return x[0]+': '+(v==null?'歷史不足':v.toFixed(2));}).join(' · ');
     ma.style.cssText='font-size:12px;line-height:1.7'; card.appendChild(ma);
+    }
     var note = document.createElement('p'); note.style.fontSize='11px';
     note.textContent='直接由全體合資格股票計算，唔係各 layer 等權平均。拆股已調整；不含股息再投資。歷史採現有成員回溯。';card.appendChild(note);
     var quality = document.createElement('p'); quality.style.cssText='font-size:12px;line-height:1.7';

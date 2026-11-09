@@ -47,6 +47,54 @@
     return `<span class="lb-regime ${cls}" title="距21E ${sgn(s.dist['21E'])} · 距50S ${sgn(s.dist['50S'])}">${icon}${s.stack} ${s.streak > 0 ? '+' : ''}${s.streak}d</span>`;
   }
 
+  function mountTimeframes(container, frames, label) {
+    ensureCss(); container.classList.add('lb-root'); container.innerHTML='';
+    const definitions=[['e9','9EMA',9,'#42c796'],['e21','21EMA',21,'#f4f4f4'],['s50','50SMA',50,'#f6c452'],['s150','150SMA',150,'#b18cff'],['s200','200SMA',200,'#f38b8b']];
+    const units={day:'日',week:'週',month:'月'};
+    let mode='day', range=126;
+    const controls=document.createElement('div');controls.className='lb-bar';container.appendChild(controls);
+    const periods=document.createElement('div');periods.className='lb-seg';controls.appendChild(periods);
+    Object.keys(units).forEach(k=>{const b=document.createElement('button');b.type='button';b.textContent=units[k]+'線';b.dataset.frame=k;b.setAttribute('aria-label',label+' '+units[k]+'線');b.addEventListener('click',()=>{mode=k;range=k==='day'?126:k==='week'?104:100000;draw();});periods.appendChild(b);});
+    const ranges=document.createElement('div');ranges.className='lb-seg';controls.appendChild(ranges);
+    const status=document.createElement('div');status.className='lb-head';container.appendChild(status);
+    const legend=document.createElement('div');legend.className='lb-bar lb-legend';container.appendChild(legend);
+    legend.innerHTML='<span><i style="border-color:#3987e5"></i>指數</span>'+definitions.map(x=>'<span><i style="border-color:'+x[3]+'"></i>'+x[1]+'</span>').join('');
+    const chart=document.createElement('div');container.appendChild(chart);
+    const values=document.createElement('div');values.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:5px 12px;font-size:12px;line-height:1.7';container.appendChild(values);
+    const note=document.createElement('div');note.className='lb-foot';note.textContent='均線期數跟隨日／週／月線；週、月取期末最後交易日指數收位。未收完的期數及均線屬暫定。EMA沿用首個收位起算，累積足夠期數才顯示。';container.appendChild(note);
+    function draw(){
+      const f=frames[mode];if(!f||!f.c||!f.c.length){chart.textContent='此週期未有數據';return;}
+      periods.querySelectorAll('button').forEach(b=>{const on=b.dataset.frame===mode;b.classList.toggle('on',on);b.setAttribute('aria-pressed',String(on));});
+      ranges.innerHTML='';const options=mode==='day'?[[63,'3M'],[126,'6M'],[251,'12M'],[100000,'全期']]:mode==='week'?[[26,'6M'],[52,'1Y'],[104,'2Y'],[100000,'全期']]:[[12,'1Y'],[24,'2Y'],[100000,'全期']];
+      options.forEach(([n,t])=>{const b=document.createElement('button');b.type='button';b.textContent=t;b.classList.toggle('on',range===n);b.addEventListener('click',()=>{range=n;draw();});ranges.appendChild(b);});
+      const start=Math.max(0,f.c.length-range), count=f.c.length-start;
+      const W=Math.max(300,Math.min(1100,container.clientWidth||420)),H=230,L=61,R=12,T=12,B=25,PW=W-L-R,PH=H-T-B;
+      const sample=[];for(let i=start;i<f.c.length;i++){sample.push(f.c[i]);if(f.h)sample.push(f.h[i],f.l[i]);definitions.forEach(([k])=>{if(Number.isFinite(f[k][i]))sample.push(f[k][i]);});}
+      let low=Math.min(...sample),high=Math.max(...sample);const pad=Math.max((high-low)*.06,high*.001);low-=pad;high+=pad;
+      const X=i=>L+((i-start)+.5)*PW/count,Y=v=>T+PH-(v-low)/(high-low)*PH;
+      chart.innerHTML='';const svg=el('svg',{viewBox:'0 0 '+W+' '+H,width:'100%',role:'img','aria-label':label+' '+units[mode]+'線及五條均線'},chart);
+      for(let i=0;i<5;i++){const v=low+(high-low)*i/4,y=Y(v);el('line',{x1:L,x2:W-R,y1:y,y2:y,stroke:'var(--lb-grid)'},svg);el('text',{x:L-5,y:y+3,'text-anchor':'end','font-size':10,fill:'var(--lb-ink2)'},svg).textContent=fmt(v);}
+      [start,f.c.length-1].forEach((i,j)=>{el('text',{x:j?W-R:L,y:H-5,'text-anchor':j?'end':'start','font-size':10,fill:'var(--lb-muted)'},svg).textContent=f.dates[i];});
+      if(f.o){for(let i=start;i<f.c.length;i++){const color=f.c[i]>=f.o[i]?'var(--lb-up)':'var(--lb-down)',w=Math.max(1,Math.min(8,PW/count*.6));el('line',{x1:X(i),x2:X(i),y1:Y(f.h[i]),y2:Y(f.l[i]),stroke:color},svg);el('rect',{x:X(i)-w/2,y:Y(Math.max(f.o[i],f.c[i])),width:w,height:Math.max(1,Math.abs(Y(f.o[i])-Y(f.c[i]))),fill:color},svg);}}
+      function line(arr,color,width){let path='',pen=false;for(let i=start;i<f.c.length;i++){if(!Number.isFinite(arr[i])){pen=false;continue;}path+=(pen?'L':'M')+X(i).toFixed(2)+' '+Y(arr[i]).toFixed(2);pen=true;}if(path)el('path',{d:path,fill:'none',stroke:color,'stroke-width':width,'stroke-linejoin':'round'},svg);}
+      if(!f.o)line(f.c,'#3987e5',2);
+      definitions.forEach(([k,t,n,color])=>line(f[k],color,k==='e21'?2.3:1.5));
+      function show(i){
+        status.textContent=label+' · '+units[mode]+'線 · '+f.dates[i]+' · 收位 '+fmt(f.c[i])+(f.complete[i]?' · 已收完':' · 未收完／暫定');
+        values.innerHTML='';definitions.forEach(([k,t,n,color])=>{const row=document.createElement('div');const title=document.createElement('span');title.textContent=t+' ';title.style.color=color;row.appendChild(title);const value=document.createElement('span');value.textContent=f[k][i]==null?'歷史不足（'+(i+1)+'/'+n+units[mode]+'）':fmt(f[k][i]);row.appendChild(value);values.appendChild(row);});
+      }
+      const cross=el('line',{x1:-10,x2:-10,y1:T,y2:H-B,stroke:'var(--lb-muted)','stroke-dasharray':'3 3'},svg);
+      const hit=el('rect',{x:L,y:T,width:PW,height:PH,fill:'transparent'},svg);
+      const point=e=>{const box=svg.getBoundingClientRect(),x=(e.clientX-box.left)*W/box.width;const i=Math.max(start,Math.min(f.c.length-1,start+Math.floor((x-L)/PW*count)));cross.setAttribute('x1',X(i));cross.setAttribute('x2',X(i));show(i);};
+      hit.addEventListener('pointermove',point);hit.addEventListener('pointerdown',point);hit.addEventListener('pointerleave',()=>{cross.setAttribute('x1',-10);cross.setAttribute('x2',-10);show(f.c.length-1);});
+      show(f.c.length-1);
+    }
+    draw();let oldWidth=container.clientWidth;
+    const ro=('ResizeObserver' in global)?new ResizeObserver(()=>{if(oldWidth!==container.clientWidth){oldWidth=container.clientWidth;draw();}}):null;
+    if(ro)ro.observe(container);
+    container._tf={ro};return {redraw:draw,destroy:()=>{if(ro)ro.disconnect();container.innerHTML='';}};
+  }
+
   function mount(container, data, L, opts) {
     opts = opts || {}; ensureCss();
     const D = data.layers[L]; if (!D) { container.textContent = '層數據攞唔到'; return; }
@@ -66,6 +114,13 @@
       <span class="num">闊度 ${s.adv_today == null ? '—' : s.adv_today + '%'}${s.adv_lt20_streak >= 2 ? ' <b class="lb-neg">連' + s.adv_lt20_streak + '日<20%</b>' : ''}</span>
       <span class="num" title="成員收企自家21EMA上 %;接棒門檻 ≥60">企21E% ${s.b21_today == null ? '—' : (s.b21_today >= 60 ? '<b class="lb-pos">' + s.b21_today + '%</b>' : s.b21_today + '%')}</span>${s.handoff && s.handoff.ok_reclaim ? '<span class="lb-chip bull" title="今日收市重奪21E・收位≥0.6・企21E%≥60(事件旗 R-001)">接棒✓ 重奪日</span>' : (s.handoff && (s.handoff.ok_state || s.handoff.ok) ? '<span class="lb-chip bull" title="企21E上・收位≥0.6・企21E%≥60(狀態旗 R-001)">接棒中</span>' : '')}`;
     container.appendChild(head);
+    if(D.timeframes){
+      const dailyNote=document.createElement('div');dailyNote.className='lb-foot';dailyNote.textContent='以上排列、接棒及闊度為日線概況；下圖可切換日／週／月。';container.appendChild(dailyNote);
+      const panel=document.createElement('div');container.appendChild(panel);
+      const view=mountTimeframes(panel,D.timeframes,L+' · '+D.label);container._lb=panel._tf;
+      const honesty=document.createElement('div');honesty.className='lb-foot';honesty.textContent='等權日鏈；缺價採最後有效估值並標記。週／月從每日指數聚合；合成 OHLC，不可用作 ATR。';container.appendChild(honesty);
+      return view;
+    }
     const bar = document.createElement('div'); bar.className = 'lb-bar';
     bar.innerHTML = `<div class="lb-seg"><button data-n="63">3M</button><button data-n="126">6M</button><button data-n="251">12M</button></div>
       <span class="lb-legend"><span><i style="border-color:var(--lb-e21)"></i>21E</span><span><i style="border-color:var(--lb-e9)"></i>9E</span>
@@ -166,5 +221,5 @@
     return { redraw: draw };
   }
   function destroy(container) { if (container._lb && container._lb.ro) container._lb.ro.disconnect(); container.innerHTML = ''; container.classList.remove('lb-root'); }
-  global.LayerBars = { mount, destroy, regimeChip };
+  global.LayerBars = { mount, destroy, regimeChip, mountTimeframes };
 })(window);
