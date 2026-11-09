@@ -47,18 +47,19 @@
     var card = document.createElement('details'); card.id = 'ai-universe-index';
     card.setAttribute('data-revision', key); card.style.cssText = 'margin:10px 0;padding:12px;border:1px solid rgba(128,128,128,.3);border-radius:10px';
     var title = document.createElement('summary');
-    title.textContent = '全 AI 等權指數  ' + last.toFixed(2) + '  ' + ((last / prev - 1) * 100).toFixed(2) + '%';
+    title.textContent = '全 AI 等權綜合指數  ' + last.toFixed(2) + '  ' + ((last / prev - 1) * 100).toFixed(2) + '%';
+    title.title = 'AI Equal-Weight Composite Index';
     title.style.cursor = 'pointer'; card.appendChild(title);
     var description = document.createElement('p');
     description.textContent = D.date + ' 收市 · ' + data.member_count + ' 隻成員 · 每股等權日鏈 · ' + data.meta.base + '=100';
     description.style.fontSize = '12px'; card.appendChild(description);
     if(data.timeframes && global.LayerBars && global.LayerBars.mountTimeframes){
       var panel=document.createElement('div');card.appendChild(panel);
-      card._indexChart=global.LayerBars.mountTimeframes(panel,data.timeframes,'全 AI 等權指數');
+      card._indexChart=global.LayerBars.mountTimeframes(panel,data.timeframes,'全 AI 等權綜合指數');
     } else {
     var values = c.slice(-126), low = Math.min.apply(null, values), high = Math.max.apply(null, values);
     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', '0 0 600 160'); svg.setAttribute('role','img'); svg.setAttribute('aria-label','全 AI 等權指數最近六個月走勢');
+    svg.setAttribute('viewBox', '0 0 600 160'); svg.setAttribute('role','img'); svg.setAttribute('aria-label','全 AI 等權綜合指數最近六個月走勢');
     svg.style.cssText = 'width:100%;height:auto;display:block';
     var line = document.createElementNS(svg.namespaceURI,'polyline');
     line.setAttribute('points', values.map(function(v,i){ return (10 + i * 580 / Math.max(1,values.length-1)) + ',' + (150 - (v-low) * 140 / (high-low || 1)); }).join(' '));
