@@ -30,9 +30,45 @@
       return false;
     });
   }
+  function universeIndex() {
+    var host = document.getElementById('grows');
+    if (!host) return;
+    var data = typeof D !== 'undefined' && D && D.aiUniverseIndex;
+    var old = document.getElementById('ai-universe-index');
+    if (!data || !data.meta || data.meta.status !== 'verified' || data.meta.asof !== D.date) {
+      if (old) old.remove();
+      return;
+    }
+    var key = D.date + ':' + (D.indexRevision || '');
+    if (old && old.getAttribute('data-revision') === key) return;
+    if (old) old.remove();
+    var c = data.c, last = c[c.length - 1], prev = c[c.length - 2];
+    if (!Number.isFinite(last) || !Number.isFinite(prev) || prev <= 0) return;
+    var card = document.createElement('details'); card.id = 'ai-universe-index';
+    card.setAttribute('data-revision', key); card.style.cssText = 'margin:10px 0;padding:12px;border:1px solid rgba(128,128,128,.3);border-radius:10px';
+    var title = document.createElement('summary');
+    title.textContent = '全 AI 等權指數  ' + last.toFixed(2) + '  ' + ((last / prev - 1) * 100).toFixed(2) + '%';
+    title.style.cursor = 'pointer'; card.appendChild(title);
+    var description = document.createElement('p');
+    description.textContent = D.date + ' 收市 · ' + data.member_count + ' 隻成員 · 每股等權日鏈 · ' + data.meta.base + '=100';
+    description.style.fontSize = '12px'; card.appendChild(description);
+    var values = c.slice(-126), low = Math.min.apply(null, values), high = Math.max.apply(null, values);
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 600 160'); svg.setAttribute('role','img'); svg.setAttribute('aria-label','全 AI 等權指數最近六個月走勢');
+    svg.style.cssText = 'width:100%;height:auto;display:block';
+    var line = document.createElementNS(svg.namespaceURI,'polyline');
+    line.setAttribute('points', values.map(function(v,i){ return (10 + i * 580 / Math.max(1,values.length-1)) + ',' + (150 - (v-low) * 140 / (high-low || 1)); }).join(' '));
+    line.setAttribute('fill','none'); line.setAttribute('stroke','#3987e5'); line.setAttribute('stroke-width','2.5'); svg.appendChild(line); card.appendChild(svg);
+    var ma = document.createElement('p');
+    ma.textContent = [['21EMA','e21'],['50SMA','s50'],['150SMA','s150'],['200SMA','s200']].map(function(x){var v=data[x[1]][c.length-1];return x[0]+': '+(v==null?'歷史不足':v.toFixed(2));}).join(' · ');
+    ma.style.cssText='font-size:12px;line-height:1.7'; card.appendChild(ma);
+    var note = document.createElement('p'); note.style.fontSize='11px';
+    note.textContent='直接由全體合資格股票計算，唔係各 layer 等權平均。拆股已調整；不含股息再投資。歷史採現有成員回溯。';card.appendChild(note);
+    host.parentNode.insertBefore(card,host);
+  }
   function decorate() {
     if (!global.LB_ENABLED) return;
-    css(); sweep();
+    css(); sweep(); universeIndex();
     var LB = payload();
     document.querySelectorAll('#grows .grow').forEach(function (grow) {
       var L = grow.getAttribute('data-g'); if (!L) return;
@@ -74,3 +110,4 @@
   function safe() { try { decorate(); } catch (e) { console.warn('LB glue', e); } }
   global.LBGlue = { afterGroupTable: safe, afterLevelDetail: safe };
 })(window);
+
