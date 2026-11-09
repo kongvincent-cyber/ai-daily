@@ -118,7 +118,7 @@
       const dailyNote=document.createElement('div');dailyNote.className='lb-foot';dailyNote.textContent='以上排列、接棒及闊度為日線概況；下圖可切換日／週／月。';container.appendChild(dailyNote);
       const panel=document.createElement('div');container.appendChild(panel);
       const view=mountTimeframes(panel,D.timeframes,L+' · '+D.label);container._lb=panel._tf;
-      const honesty=document.createElement('div');honesty.className='lb-foot';honesty.textContent='等權日鏈；缺價採最後有效估值並標記。週／月從每日指數聚合；合成 OHLC，不可用作 ATR。';container.appendChild(honesty);
+      const honesty=document.createElement('div');honesty.className='lb-foot';honesty.textContent=(data.meta&&data.meta.base?data.meta.base+'＝100；':'')+'等權日鏈；缺價採最後有效估值並標記。週／月從每日指數聚合；合成 OHLC，不可用作 ATR。';container.appendChild(honesty);
       return view;
     }
     const bar = document.createElement('div'); bar.className = 'lb-bar';
