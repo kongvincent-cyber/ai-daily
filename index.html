@@ -76,7 +76,7 @@ button{background:#1b2230;color:#aeb7c9;border:1px solid #2a3448;border-radius:8
 <div class="sub" id="session-clock"></div>
 </header>
 <nav id="workspace-nav" class="desktop-only" aria-label="Workspace sections">
-<a href="#benchmark-section">市場總覽</a><a href="#group-section">九層強弱</a><a href="#leaders-section">Top / Bottom</a><a href="#strike-section">出擊計劃</a><a href="#reports-slot">每日報告</a><a href="#history-section">歷史</a>
+<a href="#benchmark-section">市場總覽</a><a href="#group-section">九層強弱</a><a href="#research-indexes-slot">研究指數</a><a href="#leaders-section">Top / Bottom</a><a href="#strike-section">出擊計劃</a><a href="#reports-slot">每日報告</a><a href="#history-section">歷史</a>
 <button id="workspace-focus" type="button" aria-pressed="false">放大圖表</button>
 </nav>
 <div id="workspace">
@@ -96,6 +96,7 @@ button{background:#1b2230;color:#aeb7c9;border:1px solid #2a3448;border-radius:8
 <section id="strike-section" aria-label="Daily strike plan"><div id="strike"></div></section>
 <section id="statistics-section" aria-labelledby="closing-label"><h2 id="closing-label">收市分析</h2><button id="stats-view" onclick="window.MassiveLive?.toggleStats()">顯示收市分析</button><div id="stats-status" class="lab" style="margin:6px 0"></div><div class="kpi" id="kpi"></div><div id="ttags"></div></section>
 <section id="group-section" class="card" aria-labelledby="group-title"><h2 id="group-title" style="margin:0">Group strength</h2><div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0"><button id="sbtn" onclick="tg(event)">Sort: median %</button><button id="ranking-view" onclick="window.MassiveLive?.toggleRankings()">顯示收市分析</button></div><div id="group-status" class="lab"></div><div id="grows"></div></section>
+<section id="research-indexes-slot" aria-label="318 research index and matched255 comparison"></section>
 <section id="leaders-section" aria-labelledby="top-title"><h2 id="top-title">Top 5 ↑ / Bottom 5 ↓</h2><div id="top-status" class="lab" style="margin-bottom:6px"></div><div class="tags" id="tb"></div></section>
 <section id="gap-section"><h2>Gap monitor <span style="color:#5c6577;font-weight:400;font-size:11px">· tap for meaning</span></h2><div class="card" id="gap" style="font-size:13px;cursor:pointer" onclick="showGap()"></div></section>
 <section id="earnings-section"><h2>Earnings nodes</h2><div class="card earn" id="earn"></div></section>
@@ -103,10 +104,12 @@ button{background:#1b2230;color:#aeb7c9;border:1px solid #2a3448;border-radius:8
 </div>
 <div class="foot">Data patterns only — not investment advice · AES-256-GCM encrypted · <span class="e">E</span> = reported within past 24h · σ = intra-group dispersion · pos = (close−low)/(high−low)<br><span id="upd"></span></div>
 </div>
+<script src="membership_guard.js?v=20261110-production318"></script>
 <script>
 const SALT=Uint8Array.from(atob("Z2A1ADsTMohzmPeJPEV/RQ=="),c=>c.charCodeAt(0));
 const ITER=310000;
 let KEY=null,D=null,mode="med",MAN=null,HIST=null,openG=null;
+let LEGACY_ARCHIVES=null;
 const GN={L1:"L1 Energy & Power",L2:"L2 Semiconductors",L3:"L3 AI Infrastructure",L4:"L4 Models",L5:"L5 Data & Security",L6:"L6 Applications",Q:"Q Quantum",SP:"SP Space",M:"M Miner→AI"};
 const CH={broad_adv:"Broad advance",broad_dec:"Broad decline",gap_fade:"Gap-up, faded into close",dip_recover:"Gap-down, recovered",split:"Split / rotation"};
 const fp=(v,d=2)=>(v>0?"+":"")+v.toFixed(d)+"%";
@@ -121,6 +124,26 @@ async function dec(buf){const b=new Uint8Array(buf);
  const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:b.slice(0,12)},KEY,b.slice(12));
  return JSON.parse(new TextDecoder().decode(pt));}
 async function fetchEnc(p){const r=await fetch(p+"?t="+Date.now(),{cache:"no-store"});if(!r.ok)throw new Error(p);return dec(await r.arrayBuffer());}
+async function verifiedPayload(p){
+ const response=await fetch(p+'?t='+Date.now(),{cache:'no-store'});if(!response.ok)throw Error(p);
+ const bytes=await response.arrayBuffer(),data=await dec(bytes),guard=window.AIDailyMembershipGuard;
+ if(!guard)throw Error('Membership guard unavailable');
+ if(p.startsWith('data/')&&data.date<'2026-11-09'){
+  if(!LEGACY_ARCHIVES)LEGACY_ARCHIVES=await fetchEnc('archives/legacy-before-20261109.enc');
+  if(LEGACY_ARCHIVES.schema!==1||LEGACY_ARCHIVES.kind!=='preserved-authenticated-archives'||LEGACY_ARCHIVES.before!=='2026-11-09')throw Error('Historical archive catalog differs');
+  await guard.historicalArchive(data,bytes,LEGACY_ARCHIVES.entries[data.date],crypto);return data;
+ }
+ // Old authenticated255 archives predate embedded manifests; preserve that exact legacy route.
+ if(data.membership&&!data.membership_manifest){
+  if(data.usize!==255||data.indexPackaging||data.membership.is_trial)throw Error('Dated membership manifest missing');
+  await guard.payload({...data,membership:null},null,crypto);
+ }else{
+  const checked=await guard.payload(data,data.membership_manifest,crypto);
+  if(checked.metadata?.is_trial)throw Error('Trial packet cannot be displayed as production');
+ }
+ guard.formalIndex(data);
+ return data;
+}
 async function unlock(){
  const pw=document.getElementById("pw").value.trim().toUpperCase();
  document.getElementById("lockmsg").textContent="";
@@ -133,12 +156,13 @@ async function tryCache(){const k=localStorage.getItem("k");if(!k)return;
  try{KEY=await crypto.subtle.importKey("raw",Uint8Array.from(atob(k),c=>c.charCodeAt(0)),{name:"AES-GCM"},true,["decrypt"]);await boot();}
  catch(e){KEY=null;document.getElementById("lockmsg").textContent="Saved unlock temporarily unavailable. Please retry when connected.";}}
 async function boot(){
- D=await fetchEnc("latest.enc");
+ D=await verifiedPayload("latest.enc");
  document.getElementById("lock").style.display="none";
  document.getElementById("app").style.display="block";
  SER=null;LASTC=null;openG=null;render();
  if(window.AIAutomationStatus)window.AIAutomationStatus();
  if(window.AIReportsRefresh)window.AIReportsRefresh();
+ if(window.AIResearchRefresh)window.AIResearchRefresh();
  try{MAN=await (await fetch("manifest.json?t="+Date.now())).json();
   const s=document.getElementById("dsel");
   s.innerHTML=MAN.dates.slice().reverse().map(d=>`<option value="${d}">${d.slice(4,6)}/${d.slice(6,8)}</option>`).join("");
@@ -156,7 +180,7 @@ function checkOnReturn(){if(document.visibilityState!=="visible"||Date.now()-las
 document.addEventListener("visibilitychange",checkOnReturn);
 window.addEventListener("pageshow",checkOnReturn);
 window.addEventListener("online",checkOnReturn);
-async function loadDay(d){try{D=await fetchEnc("data/"+d+".enc");openG=null;LASTC=null;closeDetail();document.getElementById("q").value="";window.AppWorkspace?.onDayChange();render();}catch(e){}}
+async function loadDay(d){try{D=await verifiedPayload("data/"+d+".enc");openG=null;LASTC=null;closeDetail();document.getElementById("q").value="";window.AppWorkspace?.onDayChange();render();}catch(e){document.getElementById('auto-update-status').textContent='該日資料未通過核對；保留目前已驗證資料。';}}
 function spark(seq,w=120,h=26){
  if(!seq||seq.length<2)return"";
  const vs=seq.map(p=>p.v!==undefined?p.v:p);
@@ -236,6 +260,9 @@ function strikeRow(p,gate,alt){
 function render(){
  const wd=new Date(D.date+"T12:00:00Z").toLocaleDateString("en-US",{weekday:"short"});
  document.getElementById("sub").textContent=`收市基準 ${D.date} (${wd}) · universe ${D.usize||255}`+(D.miss.length?` · ${D.miss.length} missing`:"");
+ const pendingMembership=D.membership_manifest?.versions.find(v=>v.effective_from>D.date);
+ if(pendingMembership){const count=Object.values(pendingMembership.groups).reduce((n,ts)=>n+ts.length,0);document.getElementById("sub").textContent+=` · ${count}隻名單由 ${pendingMembership.effective_from} 起生效`;}
+ if(window.AIDailyMembershipGuard.isHistorical(D))document.getElementById('sub').textContent+=' · 封存歷史版本';
  document.getElementById("chips").innerHTML=
   `<span class="chip" style="cursor:pointer" onclick="showChar()">${charTxt()} <span style="color:#5c6577">ⓘ</span></span>`+
   `<span class="chip" style="cursor:pointer" onclick="showRegime()">SPY 長線 · ${D.regime==="牛"?"Bull":"Bear"} · vs 200DMA ${fp(D.spy.ma200,1)} <span style="color:#5c6577">ⓘ</span></span>`+
@@ -543,10 +570,11 @@ document.getElementById("pw").addEventListener("keydown",e=>{if(e.key==="Enter")
 tryCache();
 </script>
 <script defer src="workspace.js?v=20261013-desktop1"></script>
-<script defer src="mobile_update.js?v=20260929-2"></script>
+<script defer src="mobile_update.js?v=20261110-production318"></script>
 <script defer src="automation_setup.js?v=20261002-1"></script>
 <script defer src="layer_bars_tab.js?v=20261109-candles1"></script>
-<script defer src="layer_bars_glue.js?v=20261109-composite1"></script><script>
+<script defer src="layer_bars_glue.js?v=20261110-formal-dated"></script>
+<script defer src="research_indexes.js?v=20261110-research318"></script><script>
 // Report packets use the App's existing AES-GCM key; no extra login or key copy.
 (()=>{
  let box,manifest,loaded,urls=[],busy=false;
@@ -596,7 +624,7 @@ tryCache();
 
 </script>
 <script defer src="massive_live_core.js?v=20261024-layer-close1"></script>
-<script defer src="massive_live.js?v=20261103-benchmark-overview1"></script>
+<script defer src="massive_live.js?v=20261110-production318"></script>
 </body></html>
 
 

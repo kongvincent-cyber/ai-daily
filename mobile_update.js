@@ -1,4 +1,4 @@
-/* Optional local publishing helper. Never transmits or serializes a key. */
+/* Proposed dated-membership helper; private trial review only. Never exports a key. */
 (function(root,factory){
   const api=factory();
   if(typeof module==='object'&&module.exports)module.exports=api;
@@ -9,16 +9,18 @@
   const clone=x=>JSON.parse(JSON.stringify(x));
   const assert=(ok,msg)=>{if(!ok)throw new Error(msg);};
   const encode=x=>encoder.encode(JSON.stringify(x));
-  function validate(p,b){
+  const commonJS=typeof module==='object'&&!!module.exports;
+  const guard=commonJS?require('./membership_guard.js'):globalThis.AIDailyMembershipGuard;
+  function validate(p,b,expectedCount=255){
     assert(p&&p.format==='ai-daily-private-update-v1','請選擇今次提供嘅更新檔。');
     assert(/^\d{4}-\d{2}-\d{2}$/.test(p.date)&&p.date>p.base_date,'更新日期無效。');
     assert(b.latest.date===p.base_date&&b.sha256===p.base_sha256,'原 App 資料已改變，需要重新準備更新檔。');
     const d=p.payload;
-    assert(d.date===p.date&&d.usize===255&&d.earn.calendar_ok===true&&!d.miss.length,'更新資料未通過檢查。');
+    assert(d.date===p.date&&d.usize===expectedCount&&d.earn.calendar_ok===true&&!d.miss.length,'更新資料未通過檢查。');
     assert(d.picks.date===p.date&&['正常','減注','停手'].includes(d.picks.regime.gate),'作戰卡日期或狀態無效。');
     assert(d.layerBars.meta.asof===p.date,'層指數日期不一致。');
     const members=Object.values(d.members).flat().map(m=>m.t);
-    assert(members.length===255&&new Set(members).size===255&&Object.keys(d.members).length===9,'股票名單不完整。');
+    assert(members.length===expectedCount&&new Set(members).size===expectedCount&&Object.keys(d.members).length===9,'股票名單不完整。');
     assert(Object.keys(p.charts).sort().join()===members.slice().sort().join(),'圖表名單不完整。');
     const day=p.date.slice(5).replace('-','/');
     for(const t of members){
@@ -40,8 +42,12 @@
     }
     return members;
   }
-  async function createFiles(p,b,readKey,c,progress=()=>{}){
-    const members=validate(p,b),d=p.payload,day=p.date.slice(5).replace('-','/'),tag=p.date.replaceAll('-','');
+  async function createFiles(p,b,readKey,c,progress=()=>{},options={}){
+    assert(guard,'需要已驗證嘅名單檢查工具。');
+    const membership=await guard.payload(p.payload,options.manifest||p.membership_manifest,c);
+    if(membership.metadata?.is_trial)assert(commonJS&&options.localTrialPreview===true,'試驗名單只可本機測試，不能用手機更新發布。');
+    if(!membership.metadata?.is_trial)guard.formalIndex(p.payload);
+    const members=validate(p,b,membership.expected),d=p.payload,day=p.date.slice(5).replace('-','/'),tag=p.date.replaceAll('-','');
     const history=clone(b.history).filter(h=>h.date!==p.date);
     history.push(p.history_record);history.sort((a,z)=>a.date.localeCompare(z.date));
     const ser=clone(b.series);ser.dates.push(day);
@@ -74,7 +80,7 @@
     files['history.enc']=await encrypt(history.slice(-120));files['series.enc']=await encrypt(ser);
     let count=0;
     for(const t of members){files['charts/'+t+'.enc']=await encrypt(p.charts[t]);progress(++count,members.length);}
-    assert(Object.keys(files).length===260,'更新檔數量不正確。');
+    assert(Object.keys(files).length===members.length+5,'更新檔數量不正確。');
     return files;
   }
   // Small ZIP writer (stored entries) keeps the phone path dependency-free.
@@ -121,10 +127,11 @@
         const sha256=Array.from(hash,x=>x.toString(16).padStart(2,'0')).join('');
         const response=await fetch('manifest.json?t='+Date.now(),{cache:'no-store'});assert(response.ok,'日期清單讀取失敗。');
         const b={latest:await dec(latestBytes),history:await dec(await fetchBytes('history.enc')),series:await dec(await fetchBytes('series.enc')),manifest:await response.json(),sha256};
+        if(p.payload?.membership)assert(p.payload.membership.is_trial!==true,'試驗名單不能用手機更新發布。');
         const files=await createFiles(p,b,KEY,crypto,(done,total)=>{status.textContent='正在本機加密圖表 '+done+'/'+total+'…';});
         url=URL.createObjectURL(new Blob([zip(files)],{type:'application/zip'}));
         link.href=url;link.download='ai-daily-'+p.date.replaceAll('-','')+'-encrypted.zip';link.textContent='下載 '+p.date+' 加密 ZIP';link.hidden=false;
-        status.textContent='260 個檔案已驗證。下載 ZIP 後傳返呢段 ChatGPT 對話，先會正式發布。';
+        status.textContent=Object.keys(files).length+' 個檔案已驗證。下載 ZIP 後傳返呢段 ChatGPT 對話，先會正式發布。';
       }catch(error){status.textContent=error instanceof SyntaxError?'呢個檔案格式唔正確。':error.message;retry.hidden=false;}
       finally{input.disabled=false;}
     };
@@ -133,3 +140,4 @@
   }
   return {validate,createFiles,zip,install};
 });
+

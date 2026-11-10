@@ -69,7 +69,7 @@
     ma.style.cssText='font-size:12px;line-height:1.7'; card.appendChild(ma);
     }
     var note = document.createElement('p'); note.style.fontSize='11px';
-    note.textContent='直接由全體合資格股票計算，唔係各 layer 等權平均。拆股已調整；不含股息再投資。歷史採現有成員回溯。';card.appendChild(note);
+    note.textContent='直接由全體合資格股票計算，唔係各 layer 等權平均。拆股已調整；不含股息再投資。'+(data.meta.series_id==='ai-formal-dated-2022-v1'?'正式日期鏈：成員按生效日；最初255基線為回溯，並非2022當時點名單。':'歷史採現有成員回溯。');card.appendChild(note);
     var quality = document.createElement('p'); quality.style.cssText='font-size:12px;line-height:1.7';
     var coverage = data.meta.coverage || [], today = coverage[coverage.length-1];
     var audit = data.meta.independent_source;

@@ -1,4 +1,4 @@
-/* Massive real-time overlay for the original encrypted GitHub Pages App. */
+/* Proposed dated-membership overlay; private review asset, not deployed. */
 (function () {
   'use strict';
   const C=window.MassiveLiveCore, savedName='ai-daily.massive.key.v1';
@@ -6,7 +6,7 @@
   const state={key:'',book:null,baseline:null,market:null,factors:null,ws:null,generation:0,failures:0,
     phase:'未連接',detail:'',dataDetail:'',socketFailure:null,latest:null,quotes:[],charts:new Map(),controllers:new Set(),owner:crypto.randomUUID(),enabled:false};
   let cardEl,feedEl,tableEl,layerEl,statusEl,keyEl,rememberEl,leaseRelease,leaseTimer,leaseFallback=false;
-  let reconnectTimer,handshakeTimer,stableTimer,refreshTimer,paintTimer,started=false,lastPacketDate='';
+  let reconnectTimer,handshakeTimer,stableTimer,refreshTimer,paintTimer,started=false,lastPacketDate='',lastPacketRevision='';
   let rankingView='live',statsView='live',refreshGeneration=null,watchdogTimer;
   const money=x=>Number.isFinite(x)?'$'+x.toFixed(x<1?4:2):'—';
   const pct=x=>(x>0?'+':'')+x.toFixed(2)+'%';
@@ -14,7 +14,8 @@
   const benchmarkNames={SPY:'S&P 500 · 標普500',QQQ:'Nasdaq-100 · 納指100',DIA:'Dow Jones · 道指',IWM:'Russell 2000 · 小型股',SOXX:'Semiconductors · 半導體',RSP:'S&P 500 · 等權標普'};
   function node(tag,value,className) {const e=document.createElement(tag);if(value!=null)e.textContent=value;if(className)e.className=className;return e;}
   function message(phase,detail='') {state.phase=phase;state.detail=detail;paint();}
-  function symbols() {return [...new Set(Object.values(state.latest?.members||{}).flat().map(m=>m.t).concat(['SPY','QQQ','IWM','RSP','SMH','SOXX','DIA']))].filter(t=>/^[A-Z][A-Z0-9.\-]{0,14}$/.test(t));}
+  function overlayMembers(){return window.AIDailyMembershipGuard?.overlayMembers(state.latest,state.baseline,C.day(Date.now()))||state.latest?.members||{};}
+  function symbols() {return [...new Set(Object.values(overlayMembers()).flat().map(m=>m.t).concat(['SPY','QQQ','IWM','RSP','SMH','SOXX','DIA']))].filter(t=>/^[A-Z][A-Z0-9.\-]{0,14}$/.test(t));}
   async function deviceKey() {
     if (typeof KEY==='undefined'||!KEY) throw Error('Unlock');
     return crypto.subtle.importKey('raw',await crypto.subtle.exportKey('raw',KEY),{name:'AES-GCM'},false,['encrypt','decrypt']);
@@ -46,14 +47,30 @@
     try {const r=await fetch('live_baseline.enc?t='+Date.now(),{cache:'no-store',signal:ac.signal});
       if(!r.ok)throw Error('Baseline');const b=await dec(await r.arrayBuffer());
       if(g!==state.generation)return;
-      if(b.schema!==1||!b.asof||Object.keys(b.closes||{}).length!==255)throw Error('Baseline');
+      if(!window.AIDailyMembershipGuard)throw Error('Membership guard unavailable');
+      const manifest=b.membership_manifest;
+      try {
+        await window.AIDailyMembershipGuard.baseline(b,manifest,crypto);
+        window.AIDailyMembershipGuard.liveIndex(state.latest,b);state.indexError=null;
+      }
+      catch(error){state.baseline=null;state.factors=null;state.indexError=error.message;throw error;}
+      if(g!==state.generation)return;
+      const before=new Set(symbols());
       state.baseline=b;
+      const after=symbols();if(state.book)state.book.symbols=new Set(after);
+      if(state.ws?.readyState===1&&state.authenticated){
+        const added=after.filter(t=>!before.has(t)),removed=[...before].filter(t=>!after.includes(t));
+        if(removed.length)state.ws.send(JSON.stringify({action:'unsubscribe',params:removed.map(t=>'A.'+t).join(',')}));
+        if(added.length)state.ws.send(JSON.stringify({action:'subscribe',params:added.map(t=>'A.'+t).join(',')}));
+      }
     } catch (_) { /* Retain dated baseline; its session checks still apply. */ }
     finally {clearTimeout(timer);state.controllers.delete(ac);}
   }
   async function refresh(g) {
     if(!state.key||g!==state.generation||refreshGeneration===g)return;
     refreshGeneration=g;
+    await loadBaseline(g);
+    if(g!==state.generation){refreshGeneration=null;return;}
     const ts=symbols();let warnings=[];
     const apply=(index,value)=>{
       if(g!==state.generation)return value;
@@ -66,8 +83,7 @@
     };
     const calls=await Promise.allSettled([
       api('/v1/marketstatus/now',g).then(x=>apply(0,x)),
-      api('/v2/snapshot/locale/us/markets/stocks/tickers?include_otc=false&tickers='+encodeURIComponent(ts.join(',')),g).then(x=>apply(1,x)),
-      loadBaseline(g)
+      api('/v2/snapshot/locale/us/markets/stocks/tickers?include_otc=false&tickers='+encodeURIComponent(ts.join(',')),g).then(x=>apply(1,x))
     ]);
     if(g!==state.generation)return;
     // REST endpoint refusal must not kill an independently authenticated stream.
@@ -367,7 +383,7 @@
   }
   function paintMetrics(now,historical) {
     const view=C.analysisView(D.date,state.baseline,state.market,now,statsView);
-    const live=!historical&&view.live,m=C.metrics(state.latest,state.book,now);
+    const live=!historical&&view.live,m=C.metrics({...state.latest,members:overlayMembers()},state.book,now);
     const mode=C.transport(state,now),gap=m.gap,bursts=m.bursts;
     document.getElementById('closing-label').textContent=live?'今日市場統計 · '+m.session+' · 盤中暫算':'收市分析 · '+D.date+'（已完成交易日）';
     const toggle=document.getElementById('stats-view');toggle.hidden=historical;toggle.disabled=!view.eligible;toggle.textContent=live?'顯示收市分析':view.eligible?'返回今日盤中':'已顯示最新收市分析';
@@ -380,7 +396,7 @@
       ['4% bursts · 盤中暫算',bursts.ready?bursts.up+'↑ / '+bursts.down+'↓':'—',bursts.ready?bursts.up-bursts.down:null,bursts.ready?'±4% 且今日累積量 > 上日全日量；未作收市確認'+(bursts.old?' · '+bursts.old+' 隻量資料超過兩分鐘':''):'價量資料 '+bursts.covered+'/'+m.total]
     ]:[
       ['Capex − Software',fp(D.bloc.cap-D.bloc.sw)+'pp',D.bloc.cap-D.bloc.sw,'收市 '+D.date],
-      ['Advancers (of '+(D.usize||255)+')',D.stats.up+'%',D.stats.up-50,'收市 '+D.date],
+      ['Advancers (of '+(D.usize||Object.values(D.members||{}).flat().length)+')',D.stats.up+'%',D.stats.up-50,'收市 '+D.date],
       ['Gap win rate (>5% gap-ups)',D.gapmon.n?D.gapmon.win+'% ('+D.gapmon.n+' names)':'none',D.gapmon.win-50,'收市 '+D.date],
       ['4% bursts (Pradeep)',D.up4+'↑ / '+D.dn4+'↓',D.up4-D.dn4,'收市 '+D.date]
     ];
@@ -542,7 +558,7 @@
             '正式收市 · '+D.date+' · '+g+' '+spec.close.toFixed(2)+' · 21EMA '+spec.ema21.toFixed(2);
         }
       }
-      if(!state.baseline)layerEl.append(node('div','收市基準未載入；實時價仍可使用。','lab'));
+      if(!state.baseline)layerEl.append(node('div',state.indexError?'指數基準與正式資料版本未能配對；暫停指數試算。實時價仍可使用。':'收市基準未載入；實時價仍可使用。','lab'));
     }
     paintMetrics(now,historical);paintRankings();paintDetail(now,historical);
     if(cardEl.querySelector('[data-price-details]').open) {
@@ -559,8 +575,10 @@
   }
   async function packetChanged(packet) {
     if(!packet||packet.date<lastPacketDate)return;
-    if(lastPacketDate===packet.date){paint();return;}
-    lastPacketDate=packet.date;state.latest=packet;
+    if(lastPacketDate===packet.date&&lastPacketRevision===(packet.indexRevision||'')){paint();return;}
+    lastPacketDate=packet.date;lastPacketRevision=packet.indexRevision||'';state.latest=packet;
+    try {if(state.baseline)window.AIDailyMembershipGuard.liveIndex(packet,state.baseline);}
+    catch(error){state.baseline=null;state.factors=null;state.indexError=error.message;}
     const previous=state.book;state.book=new C.Book(symbols());
     for(const [t,r] of previous?.rows||[])if(state.book.symbols.has(t))state.book.rows.set(t,r);
     if(started&&state.key&&state.enabled)await start();
@@ -568,7 +586,7 @@
   }
   async function mount() {
     if(started||typeof D==='undefined'||!D||typeof KEY==='undefined'||!KEY)return;
-    started=true;state.latest=D;lastPacketDate=D.date;state.book=new C.Book(symbols());
+    started=true;state.latest=D;lastPacketDate=D.date;lastPacketRevision=D.indexRevision||'';state.book=new C.Book(symbols());
     const css=node('style','.massive-price-row{display:grid;grid-template-columns:70px minmax(0,1fr);gap:3px 8px;padding:7px 0;border-bottom:1px solid #2a3448;font-size:12px}.massive-price-row small{grid-column:2;overflow-wrap:anywhere;color:#8a93a6}.massive-price-row button{align-self:start}.massive-live{min-width:0;max-width:100%;overflow-wrap:anywhere}.massive-live .lab{overflow-wrap:anywhere;min-width:0}.massive-live summary{cursor:pointer;padding:7px 0}.massive-live input{max-width:100%;box-sizing:border-box;font-size:16px}.live-quote,.mchip .live-quote{display:block;color:#83bae9;font-size:13px;font-weight:600;margin-top:3px}.massive-live-controls{display:flex;flex-wrap:wrap;gap:7px;margin:7px 0}');document.head.append(css);
     cardEl=node('section',null,'card massive-live');cardEl.id='massive-live';
     document.head.append(node('style','@keyframes tickUp{from{background:#19653e}to{background:transparent}}@keyframes tickDown{from{background:#7d2828}to{background:transparent}}.tick-up{animation:tickUp .8s}.tick-down{animation:tickDown .8s}[data-intraday]{border:1px solid #32415a;border-radius:8px;padding:10px;margin:10px 0;overflow-wrap:anywhere}[data-live-layer]{padding:4px 12px;font-size:12px}'));
@@ -616,6 +634,7 @@
   window.addEventListener('online',()=>{if(state.key&&state.enabled)start();});
   const probe=setInterval(()=>{if(typeof D!=='undefined'&&D&&typeof KEY!=='undefined'&&KEY){clearInterval(probe);mount();}},500);
 })();
+
 
 
 
