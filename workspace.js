@@ -8,8 +8,8 @@
  function candidates(){
   if(typeof D==='undefined'||!D?.members)return [];
   const q=query.value.trim().toUpperCase();if(!q)return [];
-  return [...new Set(Object.values(D.members).flat().map(x=>x.t))]
-   .filter(t=>t.includes(q)||(D.names?.[t]||'').toUpperCase().includes(q))
+  return [...new Set(searchableTickers())]
+   .filter(t=>t.includes(q)||nm(t).toUpperCase().includes(q))
    .sort((a,b)=>(a===q?-1:b===q?1:a.startsWith(q)&&!b.startsWith(q)?-1:b.startsWith(q)&&!a.startsWith(q)?1:a.localeCompare(b))).slice(0,8);
  }
  function clearResults(){results.replaceChildren();}
@@ -18,12 +18,12 @@
   for(const t of candidates()){
    const b=document.createElement('button');b.type='button';b.className='workspace-search-result';
    const symbol=document.createElement('b');symbol.textContent=t;
-   const name=document.createElement('span');name.textContent=D.names?.[t]||'';
+   const name=document.createElement('span');name.textContent=nm(t);
    b.append(symbol,name);b.addEventListener('click',()=>{query.value=t;showT(t);clearResults();});results.append(b);
   }
  }
  function paintRecent(){
-  recent.replaceChildren();const members=new Set(Object.values(D?.members||{}).flat().map(x=>x.t));
+  recent.replaceChildren();const members=new Set(searchableTickers());
   viewed=viewed.filter(t=>members.has(t));if(!viewed.length)return;
   const label=document.createElement('span');label.className='lab';label.textContent='最近查看';recent.append(label);
   for(const t of viewed){const b=document.createElement('button');b.type='button';b.textContent=t;b.addEventListener('click',()=>{query.value=t;showT(t);clearResults();});recent.append(b);}

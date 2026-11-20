@@ -104,7 +104,7 @@ button{background:#1b2230;color:#aeb7c9;border:1px solid #2a3448;border-radius:8
 </div>
 <div class="foot">Data patterns only — not investment advice · AES-256-GCM encrypted · <span class="e">E</span> = reported within past 24h · σ = intra-group dispersion · pos = (close−low)/(high−low)<br><span id="upd"></span></div>
 </div>
-<script src="membership_guard.js?v=20261110-production318"></script>
+<script src="membership_guard.js?v=20261120-dated-release"></script>
 <script>
 const SALT=Uint8Array.from(atob("Z2A1ADsTMohzmPeJPEV/RQ=="),c=>c.charCodeAt(0));
 const ITER=310000;
@@ -114,7 +114,12 @@ const GN={L1:"L1 Energy & Power",L2:"L2 Semiconductors",L3:"L3 AI Infrastructure
 const CH={broad_adv:"Broad advance",broad_dec:"Broad decline",gap_fade:"Gap-up, faded into close",dip_recover:"Gap-down, recovered",split:"Split / rotation"};
 const fp=(v,d=2)=>(v>0?"+":"")+v.toFixed(d)+"%";
 const cls=v=>v>0?"pos":(v<0?"neg":"neu");
-const nm=t=>(D&&D.names&&D.names[t])||"";
+const nm=t=>D?.names?.[t]||window.MassiveLive?.transitionRoster?.(D)?.membership_manifest.company_names?.[t]||"";
+function searchableTickers(){
+ const live=window.MassiveLive?.transitionRoster?.(D);
+ const groups=live?Object.values(live.layers).map(layer=>layer.members):Object.values(D?.members||{}).map(rows=>rows.map(m=>m.t));
+ return groups.flat();
+}
 const short=(s,n=15)=>s.length>n?s.slice(0,n-1)+"…":s;
 async function deriveKey(pw){
  const km=await crypto.subtle.importKey("raw",new TextEncoder().encode(pw),"PBKDF2",false,["deriveKey"]);
@@ -308,11 +313,15 @@ function render(){
 function tagHtml(x,c){return `<span class="tag" onclick="showT('${x.t}')"><b class="${c}">${fp(x.c,1)}</b> ${x.t}${x.e?`<span class="e" onclick="event.stopPropagation();showEPS('${x.t}')">E</span>`:''}<small>${short(nm(x.t),14)} · ${x.g}</small></span>`}
 function renderRows(){
  const gs=[...D.groups].sort((a,b)=>mode==="med"?b.med-a.med:b.sig-a.sig);
+ const roster=window.MassiveLive?.rankingRoster?.(D);
+ document.getElementById("grows").dataset.rosterKey=roster?.next_membership.manifest_sha256||"";
  document.getElementById("grows").innerHTML=gs.map(g=>{
   const w=(g.sig>4||g.sig>Math.abs(g.med)*3)?" ⚠":"";
   const open=openG===g.g;
-  const mem=(D.members&&D.members[g.g]||[]).map(m=>
-   `<span class="mchip" onclick="event.stopPropagation();showT('${m.t}')">${m.t} <b data-member-return="${m.t}" class="${cls(m.c)}">${fp(m.c,1)}</b>${m.e?`<span class="e" onclick="event.stopPropagation();showEPS('${m.t}')">E</span>`:''}<small>${short(nm(m.t),16)}</small><small class="live-quote" data-live-symbol="${m.t}"></small></span>`).join("");
+  const closing=D.members?.[g.g]||[];
+  const members=roster?roster.layers[g.g].members.map(t=>closing.find(m=>m.t===t)||{t}):closing;
+  const mem=members.map(m=>
+   `<span class="mchip" onclick="event.stopPropagation();showT('${m.t}')">${m.t} <b data-member-return="${m.t}" class="${cls(m.c)}">${Number.isFinite(m.c)?fp(m.c,1):"—"}</b>${m.e?`<span class="e" onclick="event.stopPropagation();showEPS('${m.t}')">E</span>`:''}<small>${short(nm(m.t),16)}</small><small class="live-quote" data-live-symbol="${m.t}"></small></span>`).join("");
   return `<div class="grow" data-g="${g.g}" onclick="tgG('${g.g}')"><div class="row"><span class="caret">${open?"▼":"▶"}</span><div class="gname">${GN[g.g]||g.name}</div>${spark(D.ghist[g.g])}
    <div class="gmed ${cls(g.med)}">${fp(g.med)}</div>
    <div class="gsub">adv ${g.up}% · pos ${g.rp.toFixed(2)}<br>σ ${g.sig.toFixed(1)}${w}</div></div>
@@ -344,7 +353,14 @@ function triLine(a,b,c,W=536,H=150){
  <polyline points="${p(a)}" fill="none" stroke="#ffd479" stroke-width="1.8"/></svg>`;}
 function tgG(g){openG=(openG===g)?null:g;renderRows();}
 function tg(ev){mode=mode==="med"?"sig":"med";renderRows();if(ev)ev.stopPropagation();}
-function findM(t){for(const g in (D.members||{})){const m=(D.members[g]||[]).find(x=>x.t===t);if(m)return {...m,g};}return null;}
+function findM(t){
+ for(const [g,rows] of Object.entries(D.members||{})){const m=rows.find(x=>x.t===t);if(m)return {...m,g};}
+ const roster=window.MassiveLive?.transitionRoster?.(D);
+ for(const [g,layer] of Object.entries(roster?.layers||{})){
+  if(layer.members.includes(t))return {t,g,starts:roster.next_session};
+ }
+ return null;
+}
 const MAPRESETS=[
  {label:"① SMA 10 / 50 / 200",keys:["m10","m50","m200"]},
  {label:"② SMA 20 / 100 / 200",keys:["m20","m100","m200"]},
@@ -366,6 +382,15 @@ function drawTickChart(){
 async function showT(t){
  const m=findM(t);const d=document.getElementById("det");
  if(!m){d.style.display="none";return;}
+ if(m.starts){
+  LASTC=null;
+  d.replaceChildren();
+  const close=document.createElement("button");close.type="button";close.className="x";close.textContent="✕";close.setAttribute("aria-label","Close detail");close.onclick=closeDetail;
+  const title=document.createElement("b");title.textContent=t+" · "+nm(t);
+  const label=document.createElement("div");label.className="lab";label.textContent=GN[m.g]+" · "+m.starts+" 起計入。首份正式收市數據將於該交易日完結後顯示。";
+  const quote=document.createElement("div");quote.className="lab live-quote";quote.dataset.liveSymbol=t;
+  d.append(close,title,label,quote);d.style.display="block";revealDetail(t);window.MassiveLive?.paint();return;
+ }
  const sh=(D.sh&&D.sh[t])||[];
  d.innerHTML=`<button type="button" class="x" aria-label="Close detail" onclick="closeDetail()">✕</button>
   <b>${t}</b> <span style="color:#aeb7c9">${nm(t)}</span> <span class="lab">${GN[m.g]||m.g}</span>${m.e?`<span class="e" style="cursor:pointer" onclick="showEPS('${t}')">reported past 24h — tap for est vs actual</span>`:''}
@@ -390,7 +415,7 @@ function srch(q){
  if(!q){closeDetail();return;}
  if(findM(q)){showT(q);return;}
  if(D.names){ // search by company name
-  const hit=Object.keys(D.names).find(t=>D.names[t].toUpperCase().includes(q));
+  const hit=searchableTickers().find(t=>nm(t).toUpperCase().includes(q));
   if(hit)showT(hit);
  }
 }
@@ -569,7 +594,7 @@ async function showAdv(){
 document.getElementById("pw").addEventListener("keydown",e=>{if(e.key==="Enter")unlock()});
 tryCache();
 </script>
-<script defer src="workspace.js?v=20261013-desktop1"></script>
+<script defer src="workspace.js?v=20261120-dated-release"></script>
 <script defer src="mobile_update.js?v=20261110-production318"></script>
 <script defer src="automation_setup.js?v=20261002-1"></script>
 <script defer src="layer_bars_tab.js?v=20261109-candles1"></script>
@@ -624,7 +649,7 @@ tryCache();
 
 </script>
 <script defer src="massive_live_core.js?v=20261024-layer-close1"></script>
-<script defer src="massive_live.js?v=20261110-production318"></script>
+<script defer src="massive_live.js?v=20261120-dated-release"></script>
 </body></html>
 
 

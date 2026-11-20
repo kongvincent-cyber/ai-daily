@@ -53,11 +53,26 @@
     historicalVerified.add(data);return {legacy:true,historical:true,expected:actual.length};
   }
   async function verify(groups,day,metadata,manifest,crypto){
-    const actual=members(groups),selected=groupsAt(manifest,day);
+    const actual=members(groups);
+    const selected=groupsAt(manifest,day);
+    // A later admission must retain the exact release hash of an earlier close.
+    const prior=manifest.prior_releases||[];
+    const pos=prior.findIndex(release=>iso(release.superseded_from)>day);
+    let dated=manifest;
+    if(pos>=0){
+      const release=prior[pos];
+      const versions=manifest.versions.filter(v=>v.effective_from<release.superseded_from);
+      const names=new Set(versions.flatMap(v=>members(v.groups)));
+      dated={...manifest,manifest_id:release.manifest_id,description:release.description,source_commit:release.source_commit,
+        versions,company_names:Object.fromEntries(Object.entries(manifest.company_names).filter(([ticker])=>names.has(ticker)))};
+      if(pos)dated.prior_releases=prior.slice(0,pos);
+      else delete dated.prior_releases;
+    }
     assert(plain(metadata),'Membership metadata required');
-    const bytes=new TextEncoder().encode(canonical(manifest));
+    const bytes=new TextEncoder().encode(canonical(dated));
     const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),x=>x.toString(16).padStart(2,'0')).join('');
-    const expected={manifest_id:manifest.manifest_id,manifest_sha256:hash,version:selected.version,effective_from:selected.effective_from,
+    if(pos>=0)assert(hash===prior[pos].manifest_sha256,'Historical membership release digest differs');
+    const expected={manifest_id:dated.manifest_id,manifest_sha256:hash,version:selected.version,effective_from:selected.effective_from,
       asof:day,member_count:members(selected.groups).length,group_counts:Object.fromEntries(Object.entries(selected.groups).map(([g,ts])=>[g,ts.length])),
       is_trial:manifest.mode==='trial',production_publish_allowed:manifest.mode!=='trial'};
     for(const [key,value] of Object.entries(expected))assert(same(metadata[key],value),'Membership metadata mismatch: '+key);

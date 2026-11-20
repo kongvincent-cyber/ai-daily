@@ -15,6 +15,16 @@
   function node(tag,value,className) {const e=document.createElement(tag);if(value!=null)e.textContent=value;if(className)e.className=className;return e;}
   function message(phase,detail='') {state.phase=phase;state.detail=detail;paint();}
   function overlayMembers(){return window.AIDailyMembershipGuard?.overlayMembers(state.latest,state.baseline,C.day(Date.now()))||state.latest?.members||{};}
+  function transitionRoster(packet){
+    const b=state.baseline;
+    if(!packet||packet.date!==state.latest?.date||b?.asof!==packet.date||
+       b.next_session!==C.day(Date.now())||!b.next_membership||b.membership?.version===b.next_membership.version)return null;
+    return b;
+  }
+  function rankingRoster(packet){
+    const b=transitionRoster(packet);
+    return b&&C.analysisView(packet.date,b,state.market,Date.now(),rankingView).live?b:null;
+  }
   function symbols() {return [...new Set(Object.values(overlayMembers()).flat().map(m=>m.t).concat(['SPY','QQQ','IWM','RSP','SMH','SOXX','DIA']))].filter(t=>/^[A-Z][A-Z0-9.\-]{0,14}$/.test(t));}
   async function deviceKey() {
     if (typeof KEY==='undefined'||!KEY) throw Error('Unlock');
@@ -331,6 +341,10 @@
     const view=C.analysisView(D.date,state.baseline,state.market,now,rankingView),live=!historical&&view.live;
     const title=document.getElementById('group-title'),topTitle=document.getElementById('top-title'),container=document.getElementById('grows'),tb=document.getElementById('tb');
     if(!title||!container||!tb)return;
+    if((container.dataset.rosterKey||'')!==(rankingRoster(D)?.next_membership.manifest_sha256||'')){
+      renderRows();
+      return;
+    }
     const result=C.rankings(state.baseline,state.book,state.factors,now),byTicker=new Map(result.rows.map(x=>[x.t,x]));
     const market=state.market,marketFresh=market&&Math.abs(now-Date.parse(market.serverTime))<180000;
     const session=marketFresh?(market.earlyHours?'盤前':market.afterHours?'盤後':market.market==='open'?'盤中':'休市最後行情'):'市場狀態待核實';
@@ -563,9 +577,9 @@
     paintMetrics(now,historical);paintRankings();paintDetail(now,historical);
     if(cardEl.querySelector('[data-price-details]').open) {
       tableEl.replaceChildren();const search=cardEl.querySelector('[data-live-search]').value.trim().toUpperCase();
-      for(const t of symbols().filter(t=>!search||t.includes(search)||(state.latest.names?.[t]||'').toUpperCase().includes(search)).sort()) {
+      for(const t of symbols().filter(t=>!search||t.includes(search)||(nm(t)||'').toUpperCase().includes(search)).sort()) {
         const r=state.book.rows.get(t),row=node('div',null,'massive-price-row');row.dataset.ticker=t;
-        const title=node('button',t);title.type='button';title.addEventListener('click',()=>{if(typeof showT==='function'&&state.latest.members&&Object.values(state.latest.members).flat().some(m=>m.t===t))showT(t);});
+        const title=node('button',t);title.type='button';title.addEventListener('click',()=>{if(typeof showT==='function'&&findM(t))showT(t);});
         row.append(title,node('span',priceLine(t,now)));
         if(r?.bid&&r?.ask)row.append(node('small',`買 ${money(r.bid)} / 賣 ${money(r.ask)} · ${clock(r.quoteAt)}${now-r.quoteAt>120000?' · 最後買賣盤':''}`));
         tableEl.append(row);
@@ -624,7 +638,7 @@
     paintTimer=setInterval(paint,1000);state.key=await restoreKey();setup.open=!state.key;
     if(state.key)await start();else {message('未連接','呢部裝置未載入 Massive key；請在下方連接，唔使重新訂閱。');await loadBaseline();paint();}
   }
-  window.MassiveLive={packetChanged:packet=>{mount().then(()=>packetChanged(packet));},paint,stop,paintRankings,showBenchmark,
+  window.MassiveLive={packetChanged:packet=>{mount().then(()=>packetChanged(packet));},paint,stop,paintRankings,showBenchmark,transitionRoster,rankingRoster,
     toggleStats:()=>{statsView=statsView==='live'?'close':'live';paint();},
     toggleRankings:()=>{rankingView=rankingView==='live'?'close':'live';paint();}};
   document.addEventListener('visibilitychange',()=>{if(document.hidden&&state.enabled)stop('背景暫停','返回 App 後自動重新連線。');else if(!document.hidden&&state.key&&state.enabled)start();});
