@@ -111,6 +111,17 @@ const ITER=310000;
 let KEY=null,D=null,mode="med",MAN=null,HIST=null,openG=null;
 let LEGACY_ARCHIVES=null;
 const GN={L1:"L1 Energy & Power",L2:"L2 Semiconductors",L3:"L3 AI Infrastructure",L4:"L4 Models",L5:"L5 Data & Security",L6:"L6 Applications",Q:"Q Quantum",SP:"SP Space",M:"M Miner→AI"};
+function groupName(g,roster){
+ const manifest=roster?.membership_manifest||D?.membership_manifest;
+ const day=roster?.next_session||D?.date;
+ let snapshot;
+ for(const candidate of manifest?.versions||[]){
+  if(candidate.effective_from>day)break;
+  snapshot=candidate;
+ }
+ return snapshot?.group_labels?.[g]||GN[g]||g;
+}
+const htmlText=value=>String(value).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
 const CH={broad_adv:"Broad advance",broad_dec:"Broad decline",gap_fade:"Gap-up, faded into close",dip_recover:"Gap-down, recovered",split:"Split / rotation"};
 const fp=(v,d=2)=>(v>0?"+":"")+v.toFixed(d)+"%";
 const cls=v=>v>0?"pos":(v<0?"neg":"neu");
@@ -197,7 +208,7 @@ function spark(seq,w=120,h=26){
   <polyline points="${pts}" fill="none" stroke="${vs[vs.length-1]>=0?"#4cc38a":"#ff7a6b"}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
 }
 function charTxt(){
- if(D.charc&&CH[D.charc]) return CH[D.charc]+(D.leads?` · leaders: ${D.leads.map(g=>GN[g]).join(" / ")}`:"");
+ if(D.charc&&CH[D.charc]) return CH[D.charc]+(D.leads?` · leaders: ${D.leads.map(g=>htmlText(groupName(g))).join(" / ")}`:"");
  return D.char;
 }
 function decorate(list){ // "PLTR(L6) 盤後+8%（快照）" → "PLTR Palantir (L6) after-hrs..."
@@ -271,7 +282,7 @@ function render(){
  document.getElementById("chips").innerHTML=
   `<span class="chip" style="cursor:pointer" onclick="showChar()">${charTxt()} <span style="color:#5c6577">ⓘ</span></span>`+
   `<span class="chip" style="cursor:pointer" onclick="showRegime()">SPY 長線 · ${D.regime==="牛"?"Bull":"Bear"} · vs 200DMA ${fp(D.spy.ma200,1)} <span style="color:#5c6577">ⓘ</span></span>`+
-  (D.lead3.length?`<span class="chip">3-day leaders: ${D.lead3.map(g=>GN[g]||g).join(", ")}</span>`:"");
+  (D.lead3.length?`<span class="chip">3-day leaders: ${D.lead3.map(g=>htmlText(groupName(g))).join(", ")}</span>`:"");
  renderStrike();
  document.getElementById('closing-label').textContent='收市分析 · '+D.date+'（以下統計不是盤中報價）';
  const bmNames={SPY:'S&P 500 · 標普500',QQQ:'Nasdaq-100 · 納指100',DIA:'Dow Jones · 道指',IWM:'Russell 2000 · 小型股',SOXX:'Semiconductors · 半導體',RSP:'S&P 500 · 等權標普'};
@@ -314,15 +325,16 @@ function tagHtml(x,c){return `<span class="tag" onclick="showT('${x.t}')"><b cla
 function renderRows(){
  const gs=[...D.groups].sort((a,b)=>mode==="med"?b.med-a.med:b.sig-a.sig);
  const roster=window.MassiveLive?.rankingRoster?.(D);
+ const closedByTicker=roster?new Map(Object.values(D.members).flat().map(m=>[m.t,m])):null;
  document.getElementById("grows").dataset.rosterKey=roster?.next_membership.manifest_sha256||"";
  document.getElementById("grows").innerHTML=gs.map(g=>{
   const w=(g.sig>4||g.sig>Math.abs(g.med)*3)?" ⚠":"";
   const open=openG===g.g;
   const closing=D.members?.[g.g]||[];
-  const members=roster?roster.layers[g.g].members.map(t=>closing.find(m=>m.t===t)||{t}):closing;
+  const members=roster?roster.layers[g.g].members.map(t=>closedByTicker.get(t)||{t}):closing;
   const mem=members.map(m=>
    `<span class="mchip" onclick="event.stopPropagation();showT('${m.t}')">${m.t} <b data-member-return="${m.t}" class="${cls(m.c)}">${Number.isFinite(m.c)?fp(m.c,1):"—"}</b>${m.e?`<span class="e" onclick="event.stopPropagation();showEPS('${m.t}')">E</span>`:''}<small>${short(nm(m.t),16)}</small><small class="live-quote" data-live-symbol="${m.t}"></small></span>`).join("");
-  return `<div class="grow" data-g="${g.g}" onclick="tgG('${g.g}')"><div class="row"><span class="caret">${open?"▼":"▶"}</span><div class="gname">${GN[g.g]||g.name}</div>${spark(D.ghist[g.g])}
+  return `<div class="grow" data-g="${g.g}" onclick="tgG('${g.g}')"><div class="row"><span class="caret">${open?"▼":"▶"}</span><div class="gname">${htmlText(groupName(g.g,roster))}</div>${spark(D.ghist[g.g])}
    <div class="gmed ${cls(g.med)}">${fp(g.med)}</div>
    <div class="gsub">adv ${g.up}% · pos ${g.rp.toFixed(2)}<br>σ ${g.sig.toFixed(1)}${w}</div></div>
    <div class="lab" data-group-caption>收市分析 · ${D.date}</div><div class="lab live-quote" data-live-layer="${g.g}"></div>
@@ -353,13 +365,19 @@ function triLine(a,b,c,W=536,H=150){
  <polyline points="${p(a)}" fill="none" stroke="#ffd479" stroke-width="1.8"/></svg>`;}
 function tgG(g){openG=(openG===g)?null:g;renderRows();}
 function tg(ev){mode=mode==="med"?"sig":"med";renderRows();if(ev)ev.stopPropagation();}
-function findM(t){
- for(const [g,rows] of Object.entries(D.members||{})){const m=rows.find(x=>x.t===t);if(m)return {...m,g};}
- const roster=window.MassiveLive?.transitionRoster?.(D);
- for(const [g,layer] of Object.entries(roster?.layers||{})){
-  if(layer.members.includes(t))return {t,g,starts:roster.next_session};
+function findM(t,roster=window.MassiveLive?.transitionRoster?.(D)){
+ let closing=null;
+ for(const [g,rows] of Object.entries(D.members||{})){
+  const row=rows.find(m=>m.t===t);
+  if(row){closing={...row,g};break;}
  }
- return null;
+ for(const [g,layer] of Object.entries(roster?.layers||{})){
+  if(!layer.members.includes(t))continue;
+  if(!closing)return {t,g,starts:roster.next_session};
+  if(closing.g!==g)return {...closing,g,closingGroup:closing.g};
+  break;
+ }
+ return closing;
 }
 const MAPRESETS=[
  {label:"① SMA 10 / 50 / 200",keys:["m10","m50","m200"]},
@@ -380,20 +398,21 @@ function drawTickChart(){
   ((!(D.eps&&D.eps[LASTC.t])&&LASTC.eps&&LASTC.eps.last)?`<div class="lab" style="margin-top:4px;cursor:pointer;border-bottom:1px dotted #5c6577;display:inline-block" onclick="showEPS('${LASTC.t}')">Last earnings ${LASTC.eps.last.d}: ${fmt$(LASTC.eps.last.act)} vs ${fmt$(LASTC.eps.last.est)} (${LASTC.eps.last.sp}%)${LASTC.eps.up&&LASTC.eps.up.est!=null?` · next est ${fmt$(LASTC.eps.up.est)}`:""} — tap</div>`:"");
 }
 async function showT(t){
- const m=findM(t);const d=document.getElementById("det");
+ const roster=window.MassiveLive?.transitionRoster?.(D);
+ const m=findM(t,roster);const d=document.getElementById("det");
  if(!m){d.style.display="none";return;}
  if(m.starts){
   LASTC=null;
   d.replaceChildren();
   const close=document.createElement("button");close.type="button";close.className="x";close.textContent="✕";close.setAttribute("aria-label","Close detail");close.onclick=closeDetail;
   const title=document.createElement("b");title.textContent=t+" · "+nm(t);
-  const label=document.createElement("div");label.className="lab";label.textContent=GN[m.g]+" · "+m.starts+" 起計入。首份正式收市數據將於該交易日完結後顯示。";
+  const label=document.createElement("div");label.className="lab";label.textContent=groupName(m.g,roster)+" · "+m.starts+" 起計入。首份正式收市數據將於該交易日完結後顯示。";
   const quote=document.createElement("div");quote.className="lab live-quote";quote.dataset.liveSymbol=t;
   d.append(close,title,label,quote);d.style.display="block";revealDetail(t);window.MassiveLive?.paint();return;
  }
  const sh=(D.sh&&D.sh[t])||[];
  d.innerHTML=`<button type="button" class="x" aria-label="Close detail" onclick="closeDetail()">✕</button>
-  <b>${t}</b> <span style="color:#aeb7c9">${nm(t)}</span> <span class="lab">${GN[m.g]||m.g}</span>${m.e?`<span class="e" style="cursor:pointer" onclick="showEPS('${t}')">reported past 24h — tap for est vs actual</span>`:''}
+  <b>${t}</b> <span style="color:#aeb7c9">${nm(t)}</span> <span class="lab">${htmlText(groupName(m.g,roster))}${roster?" · "+roster.next_session:""}</span>${m.closingGroup?` <span class="lab">${D.date} 收市所屬 · ${htmlText(groupName(m.closingGroup))}</span>`:""}${m.e?`<span class="e" style="cursor:pointer" onclick="showEPS('${t}')">reported past 24h — tap for est vs actual</span>`:''}
   <div style="display:flex;gap:14px;align-items:center;margin-top:6px">
    <div><div class="lab">收市升跌 ${D.date}</div><div class="val ${cls(m.c)}" style="font-size:16px">${fp(m.c,1)}</div></div>
    <div><div class="lab">該日開市缺口</div><div class="val ${cls(m.gp)}" style="font-size:16px">${fp(m.gp,1)}</div></div>
